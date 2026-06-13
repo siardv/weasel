@@ -1,0 +1,12 @@
+^\.Rbuildignore$
+^\.Rhistory$
+^\.RData$
+^\.DS_Store$
+^.*\.Rproj$
+^\.Rproj\.user$
+^doc$
+^Meta$
+^.*\.Rcheck$
+^README\.md$
+^docs$
+^CITATION\.cff$

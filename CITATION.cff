@@ -1,0 +1,14 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+type: software
+title: "weasel: Wave-Based Extraction and Selection for Longitudinal Data"
+authors:
+  - family-names: "Bosch"
+    name-particle: "van den"
+    given-names: "Siard"
+    email: "siardvandenbosch@me.com"
+license: MIT
+version: "0.2.0"
+date-released: "2026-06-13"
+repository-code: "https://github.com/siardv/weasel"
+url: "https://siardv.github.io/weasel/"

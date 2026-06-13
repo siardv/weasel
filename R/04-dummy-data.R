@@ -1,0 +1,157 @@
+#' Generate synthetic longitudinal panel data
+#'
+#' Creates a long-format data frame in which wave-level missingness is
+#' represented the way real panel files represent it: a respondent who
+#' misses a wave simply has no row for that wave. Four participation
+#' mechanisms are layered (random skips, attention decay, attrition,
+#' and block dropout), and a small amount of item-level missingness
+#' (`NA` values inside the outcome columns of otherwise observed rows)
+#' can be added on top.
+#'
+#' The returned grid is therefore deliberately incomplete; this is what
+#' both weasel pipelines analyse. The function has no net effect on the
+#' caller's RNG state: the state present before the call is restored on
+#' exit, and reproducibility is controlled through `seed`.
+#'
+#' @param n_ids Number of respondents.
+#' @param n_times Number of time points (waves).
+#' @param n_vars Number of outcome variables to generate.
+#' @param prop_random Probability that any given (respondent, wave)
+#'   observation is skipped at random.
+#' @param prop_attention Asymptotic probability of attention-related
+#'   wave skipping at late waves.
+#' @param attention_center Wave at which the attention-decay curve is
+#'   centred.
+#' @param attention_scale Steepness of the attention-decay curve;
+#'   larger values give a more gradual increase.
+#' @param prop_attrition Proportion of respondents who permanently drop
+#'   out from a random wave onwards.
+#' @param prop_block Proportion of respondents who miss one contiguous
+#'   block of waves.
+#' @param block_duration_range Integer vector of length 2 giving the
+#'   min/max duration of block missingness.
+#' @param prop_item_missing Probability that an individual outcome value
+#'   on an observed row is `NA` (item nonresponse).
+#' @param id_start Starting integer for respondent identifiers.
+#' @param seed Random seed. If `NULL`, a seed is drawn and reported so
+#'   the data set can be regenerated.
+#'
+#' @return A data frame in long format with columns `id`, `time`, and
+#'   `var1` ... `varN`. Respondents keep at least one observed wave, so
+#'   the number of distinct ids always equals `n_ids`, but
+#'   `nrow(result)` is typically smaller than `n_ids * n_times`.
+#'
+#' @examples
+#' d <- generate_weasel_dummy_data(n_ids = 50, n_times = 8, seed = 1)
+#'
+#' # the grid is incomplete: wave-level missingness is row absence
+#' nrow(d) < 50 * 8
+#'
+#' # scope pipeline starts here
+#' set_weasel_scope(d, "id", "time")
+#' weasel_clear_scope()
+#'
+#' # plan pipeline starts here
+#' p <- weasel_plan(d, "id", "time", span = "core")
+#'
+#' @importFrom stats runif rbinom rnorm
+#' @export
+generate_weasel_dummy_data <- function(n_ids = 1000,
+                                       n_times = 13,
+                                       n_vars = 5,
+                                       prop_random = 0.05,
+                                       prop_attention = 0.08,
+                                       attention_center = 10,
+                                       attention_scale = 2.5,
+                                       prop_attrition = 0.06,
+                                       prop_block = 0.04,
+                                       block_duration_range = c(2, 4),
+                                       prop_item_missing = 0.02,
+                                       id_start = 800001,
+                                       seed = NULL) {
+  if (n_ids <= 0) .weasel_stop("n_ids must be > 0.")
+  if (n_times <= 2) .weasel_stop("n_times must be > 2.")
+  if (n_vars <= 0) .weasel_stop("n_vars must be > 0.")
+  if (length(block_duration_range) != 2 || any(block_duration_range < 1)) {
+    .weasel_stop("block_duration_range must be two integers >= 1.")
+  }
+
+  .weasel_with_preserved_seed({
+    if (is.null(seed)) seed <- sample.int(1e6, 1)
+    set.seed(seed)
+    .weasel_msg("seed: ", seed)
+
+    n_ids   <- as.integer(n_ids)
+    n_times <- as.integer(n_times)
+    ids_vec <- seq.int(id_start, id_start + n_ids - 1)
+
+    # participation matrix: TRUE = respondent observed at that wave
+    present <- matrix(TRUE, nrow = n_ids, ncol = n_times)
+
+    # 1) random skips
+    present[stats::runif(n_ids * n_times) < prop_random] <- FALSE
+
+    # 2) attention decay: skip probability rises along a logistic curve
+    t_seq <- seq_len(n_times)
+    p_att <- prop_attention /
+      (1 + exp(-(t_seq - attention_center) / attention_scale))
+    p_att <- pmin(pmax(p_att, 0), 0.95)
+    att_miss <- matrix(stats::runif(n_ids * n_times), nrow = n_ids) <
+      matrix(p_att, nrow = n_ids, ncol = n_times, byrow = TRUE)
+    present[att_miss] <- FALSE
+
+    # 3) attrition: permanent dropout from a random wave onwards
+    n_drop <- round(n_ids * prop_attrition)
+    if (n_drop > 0) {
+      drop_rows  <- sample.int(n_ids, n_drop)
+      drop_times <- sample.int(n_times - 1, n_drop, replace = TRUE) + 1L
+      for (k in seq_len(n_drop)) {
+        present[drop_rows[k], drop_times[k]:n_times] <- FALSE
+      }
+    }
+
+    # 4) block missingness: one contiguous interior block per affected id
+    n_block <- round(n_ids * prop_block)
+    if (n_block > 0) {
+      blk_rows <- sample.int(n_ids, n_block)
+      for (k in seq_len(n_block)) {
+        blk_start <- sample.int(max(n_times - 2L, 1L), 1) + 1L
+        dur <- sample(seq.int(block_duration_range[1],
+                              block_duration_range[2]), 1)
+        blk_end <- min(n_times, blk_start + dur - 1L)
+        present[blk_rows[k], blk_start:blk_end] <- FALSE
+      }
+    }
+
+    # guarantee every respondent keeps at least one observed wave
+    empty <- which(rowSums(present) == 0L)
+    for (r in empty) present[r, sample.int(n_times, 1)] <- TRUE
+
+    obs <- which(t(present))
+    data <- data.frame(
+      id   = as.integer(ids_vec[(obs - 1L) %/% n_times + 1L]),
+      time = as.integer((obs - 1L) %% n_times + 1L),
+      stringsAsFactors = FALSE
+    )
+
+    # outcome variables on observed rows only
+    var_generators <- list(
+      function(n) sample(0:15, n, replace = TRUE),
+      function(n) round(stats::runif(n, 5, 30), 1),
+      function(n) stats::rbinom(n, 1, 0.3),
+      function(n) sample(1:7, n, replace = TRUE),
+      function(n) round(stats::rnorm(n, mean = 10, sd = 3), 1)
+    )
+    n_obs <- nrow(data)
+    for (i in seq_len(n_vars)) {
+      g <- var_generators[[((i - 1L) %% length(var_generators)) + 1L]]
+      v <- g(n_obs)
+      if (prop_item_missing > 0) {
+        v[stats::runif(n_obs) < prop_item_missing] <- NA
+      }
+      data[[paste0("var", i)]] <- v
+    }
+
+    data[order(data$id, data$time), , drop = FALSE]
+  })
+}

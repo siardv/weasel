@@ -1,0 +1,189 @@
+---
+title: "Advanced usage"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Advanced usage}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+```{r setup}
+library(weasel)
+long_data <- generate_weasel_dummy_data(
+  n_ids = 400,
+  n_times = 12,
+  seed = 7
+)
+```
+
+## Gap semantics
+
+Two kinds of absence are treated differently throughout the package:
+
+* **Endpoints**: whether a respondent is observed at the first and last
+  wave of the window. Controlled by `require_endpoints` in scenarios
+  and reported as `has_lower` / `has_upper` in the id metrics.
+* **Interior gaps**: runs of missing waves strictly between a
+  respondent's first and last observed wave within the window. A
+  respondent observed at waves 2 to 7 of a 1-to-8 window has no
+  interior gap; late entry and early exit are not gaps.
+
+This separation keeps the constraints orthogonal: you can demand
+anchored endpoints while tolerating interior gaps, or the reverse.
+
+## Custom scenarios
+
+`weasel_plan()` accepts a custom scenario table. It must contain the
+columns `scenario`, `require_endpoints`, `max_missing`, `n_gap_max`,
+and `max_gap_max`; the table is validated and a missing column raises
+an immediate error rather than silently selecting nobody.
+
+```{r}
+my_scenarios <- data.frame(
+  scenario          = c("complete_case", "one_gap_ok", "very_lenient"),
+  require_endpoints = c(TRUE, TRUE, FALSE),
+  max_missing       = c(0, 2, 4),
+  n_gap_max         = c(0, 1, 4),
+  max_gap_max       = c(0, 2, 4)
+)
+
+plan_custom <- weasel_plan(
+  long_data,
+  id = "id",
+  wave = "time",
+  span = "core",
+  core_len = 8,
+  scenarios = my_scenarios
+)
+
+weasel_print_table(
+  weasel_compare_scenarios(plan_custom),
+  title = "Custom scenarios", digits = 3
+)
+```
+
+## Scoring and weights
+
+The composite score is built only from observed subset quality. With
+default weights it is:
+
+```
+score = 2.0 * mean_prop_present      (coverage)
+      + 1.2 * endpoint_rate          (endpoints)
+      + 0.8 * n_ids / max(n_ids)     (relative sample size)
+      - 0.6 * worst_missing / L      (worst retained respondent)
+      - 0.4 * (mean_n_gap + mean_max_gap) / L   (gap structure)
+```
+
+Scenarios that retain no respondents receive `NA` and are never
+recommended; ties go to the larger sample. You can reweight any term:
+
+```{r}
+size_first <- weasel_compare_scenarios(
+  plan_custom,
+  weights = c(size = 3, coverage = 1)
+)
+size_first$scenario[size_first$recommended]
+```
+
+## Span selection in detail
+
+`span = "core"` slides a window of `core_len` consecutive integer waves
+over the full observed range and scores each window by mean per-wave
+respondent coverage; waves with no observations contribute zero, so the
+chosen window is always a contiguous block of `core_len` waves. Use
+`span = "full"` to keep the entire range:
+
+```{r}
+plan_full <- weasel_plan(long_data, "id", "time", span = "full")
+c(lower = plan_full$lower, upper = plan_full$upper)
+```
+
+## Auditing per-respondent metrics
+
+The plan object exposes the per-respondent table that the scenarios
+filter on, which is useful for custom diagnostics:
+
+```{r}
+m <- plan_custom$id_metrics
+weasel_print_table(head(m, 8), title = "Per-respondent metrics")
+
+# distribution of interior gap counts
+table(m$n_gap)
+```
+
+## Scope pipeline constraints
+
+The exploratory pipeline accepts the same structural ideas. The `size`
+argument controls the minimum number of observed waves a respondent
+needs to be kept; `gap` and `n_gap` apply interior-gap constraints at
+reshape time:
+
+```{r}
+set_weasel_scope(
+  long_data,
+  id = "id", wave = "time",
+  lower = 2, upper = 11,
+  size = 6,        # at least 6 observed waves within the span
+  gap = 1,         # no interior gap longer than 1 wave
+  n_gap = 2        # at most 2 interior gaps
+)
+evaluate_weasel_scope()
+reshape_to_wide()
+summarize_waves()
+weasel_print_table(filter_wave_summary(), title = "Constrained patterns",
+                   n = 8)
+weasel_clear_scope()
+```
+
+## Justification styles
+
+`weasel_justify_subset()` writes the methods paragraph in three
+registers:
+
+```{r}
+cat(weasel_justify_subset(plan_custom, "one_gap_ok", style = "concise"),
+    "\n\n")
+cat(weasel_justify_subset(plan_custom, "one_gap_ok", style = "methods",
+                          author = "van den Bosch", year = "2026"),
+    "\n")
+```
+
+The `extended` style adds sensitivity framing for reviewers:
+
+```{r}
+cat(weasel_justify_subset(plan_custom, "one_gap_ok", style = "extended"),
+    "\n")
+```
+
+## Quiet mode and reproducibility
+
+All status messages respect a single option:
+
+```{r}
+options(weasel.verbose = FALSE)
+p_quiet <- weasel_plan(long_data, "id", "time", span = "full")
+options(weasel.verbose = TRUE)
+```
+
+The data generator and the cosmetic console colours preserve your RNG
+state, so calling weasel functions never shifts the random numbers your
+own analysis draws afterwards:
+
+```{r}
+set.seed(99)
+before <- rnorm(2)
+
+set.seed(99)
+tmp <- generate_weasel_dummy_data(n_ids = 20, n_times = 5, seed = 1)
+after <- rnorm(2)
+
+identical(before, after)
+```

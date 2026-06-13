@@ -1,0 +1,192 @@
+---
+title: "Introduction to weasel"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Introduction to weasel}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+## What weasel does
+
+Longitudinal panel studies rarely deliver the data you wish you had.
+Respondents skip waves, drop out, or return after long absences. Before
+any substantive analysis you must decide which respondents and which
+waves to keep, and that decision shapes everything downstream.
+
+The weasel package (Wave-based Extraction and Selection for
+Longitudinal Data) turns this selection step into an explicit,
+inspectable, and reproducible workflow. Throughout the package, a
+respondent counts as observed at a wave when a row with that (id, wave)
+pair exists in the long-format data; a missed wave is simply an absent
+row, which is how real panel files are usually delivered.
+
+It offers two complementary pipelines:
+
+1. A **scope pipeline** for interactive exploration of wave patterns.
+2. A **plan pipeline** for comparing predefined selection scenarios and
+   generating methods-section text.
+
+```{r setup}
+library(weasel)
+```
+
+## Synthetic example data
+
+We start with the built-in generator, which layers several realistic
+participation mechanisms (random skips, attention decay, permanent
+attrition, and block dropout) and removes the corresponding rows:
+
+```{r}
+long_data <- generate_weasel_dummy_data(
+  n_ids = 300,
+  n_times = 12,
+  seed = 2026
+)
+str(long_data)
+```
+
+Note that the grid is incomplete by design:
+
+```{r}
+nrow(long_data)
+300 * 12
+```
+
+A small amount of item nonresponse (`NA` values inside outcome columns
+of observed rows) is also injected via `prop_item_missing`; it is
+distinct from wave-level missingness and does not affect selection.
+
+## The scope pipeline
+
+The scope pipeline holds its state inside the package itself, not in
+your global environment, so it never interferes with your own objects.
+
+```{r}
+set_weasel_scope(
+  long_data,
+  id = "id",
+  wave = "time",
+  lower = 2,
+  upper = 11
+)
+evaluate_weasel_scope()
+reshape_to_wide()
+summarize_waves()
+```
+
+The pattern summary groups respondents by their participation pattern.
+In the table, `waves` shows the pattern (a `.` marks a missing wave),
+`n` is the number of observed waves in that pattern, and `ids` counts
+the respondents who share it:
+
+```{r}
+weasel_print_table(filter_wave_summary(), title = "Wave patterns", n = 10)
+```
+
+`filter_wave_summary()` narrows the table. For instance, patterns with
+at least 9 observed waves that are shared by at least 5 respondents:
+
+```{r}
+weasel_print_table(
+  filter_wave_summary(n_range = c(9, 10), ids_range = c(5, Inf)),
+  title = "Dense, common patterns"
+)
+```
+
+`get_data_by_row()` then pulls the original long-format rows behind any
+pattern row, ready for analysis:
+
+```{r}
+subset_row1 <- get_data_by_row(1)
+weasel_print_table(head(subset_row1, 8), title = "Most common pattern, data")
+```
+
+You can also constrain patterns structurally when setting the scope.
+The `gap` argument limits the length of interior gaps (runs of missing
+waves strictly between a respondent's first and last observed wave),
+and `n_gap` limits how many such gaps are allowed:
+
+```{r}
+set_weasel_scope(long_data, "id", "time", gap = 1, n_gap = 1)
+evaluate_weasel_scope()
+reshape_to_wide()
+summarize_waves()
+weasel_print_table(filter_wave_summary(), title = "Gap-constrained", n = 5)
+```
+
+When you are done, clear the scope:
+
+```{r}
+weasel_clear_scope()
+```
+
+## The plan pipeline
+
+For confirmatory work you usually want a small number of named,
+defensible scenarios rather than free exploration. `weasel_plan()`
+evaluates three defaults:
+
+* `anchored_strict`: observed endpoints, no missing waves.
+* `anchored_balanced`: observed endpoints, at most one missing wave and
+  one interior gap.
+* `lenient_info_max`: no endpoint requirement, up to two missing waves
+  and two interior gaps.
+
+```{r}
+plan_obj <- weasel_plan(long_data, id = "id", wave = "time", span = "core")
+```
+
+With `span = "core"` the package slides a window of `core_len`
+consecutive waves across the full wave range and picks the window with
+the highest average per-wave coverage.
+
+```{r}
+comparison <- weasel_compare_scenarios(plan_obj)
+weasel_print_table(comparison, title = "Scenario comparison", digits = 3)
+```
+
+The `score` column is computed from observed subset quality (coverage,
+endpoint rate, relative sample size, worst-case missingness, and gap
+structure), never from a scenario's configured tolerances; see
+`?weasel_compare_scenarios` for the exact formula and how to override
+the weights. A sentence version is available too:
+
+```{r}
+cat(weasel_compare_to_sentence(comparison), "\n")
+```
+
+Audit a scenario before committing to it:
+
+```{r}
+s <- weasel_summarize_subset(plan_obj, "anchored_balanced")
+weasel_print_table(s$headline, title = "Headline", digits = 3)
+weasel_print_table(s$per_wave_coverage, title = "Per-wave coverage")
+cat(weasel_subset_to_sentence(s), "\n")
+```
+
+Finally, extract the analysis-ready subset:
+
+```{r}
+analysis_data <- weasel_apply(plan_obj, "anchored_balanced")
+dim(analysis_data)
+```
+
+## Justification text for your methods section
+
+Documenting the selection is as important as making it. The package
+drafts that paragraph for you:
+
+```{r}
+cat(weasel_justify_subset(plan_obj, "anchored_balanced"), "\n")
+```
+
+See the "Advanced usage" vignette for custom scenarios, scoring
+weights, and writing style options.

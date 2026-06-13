@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>weasel: Workflow Guide</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <!-- HEADER -->
+  <header class="site-header">
+    <div class="container">
+      <div class="header-inner">
+        <div class="brand">
+          <span class="brand-name">weasel</span>
+          <span class="brand-version">v1.0.0</span>
+        </div>
+        <div class="brand-full">Wave-based Extraction and Selection for Longitudinal Data</div>
+      </div>
+    </div>
+    <div class="header-rule"></div>
+  </header>
+
+  <!-- INTRO -->
+  <section class="intro-section">
+    <div class="container">
+      <div class="intro-inner">
+        <h1 class="intro-headline">weasel turns wave-and-respondent selection in longitudinal panels into an explicit, reproducible workflow.</h1>
+        <p class="intro-lede">
+          Which workflow do you need? Answer one question at a time to reach the right recipe.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- TREE -->
+  <section class="tree-section">
+    <div class="container">
+      <div class="tree-inner">
+
+        <div class="path-trail" id="path-trail" aria-label="Decisions made so far"></div>
+        <div class="tree-stage" id="tree-stage" role="main" aria-live="polite"></div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ABOUT (quiet, below the tool) -->
+  <section class="about-section">
+    <div class="container">
+      <div class="overview-grid">
+        <div class="overview-col">
+          <h2 class="ov-heading">What the package does</h2>
+          <ul class="ov-list">
+            <li>Maps wave participation patterns across respondents</li>
+            <li>Compares selection scenarios with explicit structural constraints</li>
+            <li>Produces analysis-ready long-format data frames</li>
+            <li>Generates prose justifications suitable for methods sections</li>
+          </ul>
+        </div>
+        <div class="overview-col">
+          <h2 class="ov-heading">Two core pipelines</h2>
+          <div class="pipeline-list">
+            <div class="pip-row">
+              <span class="pip-tag pip-scope">Scope</span>
+              <span class="pip-desc"><strong>Exploratory.</strong> Map the missingness landscape before committing to any selection rule.</span>
+            </div>
+            <div class="pip-row">
+              <span class="pip-tag pip-plan">Plan</span>
+              <span class="pip-desc"><strong>Comparative.</strong> Enforce explicit constraints, score trade-offs, and extract a reproducible sample.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-inner">
+        <span>weasel R package &middot; MIT License</span>
+        <span class="footer-sep">&middot;</span>
+        <code class="install-line">install.packages("weasel")</code>
+        <span class="footer-sep">&middot;</span>
+        <span>Run <code>weasel_example()</code> for a quick-start demonstration</span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
