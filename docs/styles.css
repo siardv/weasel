@@ -621,6 +621,28 @@ a:hover { text-decoration: underline; }
 
 .footer-sep { color: var(--gray-400); }
 
+.footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .55rem;
+  margin-top: .55rem;
+  font-family: var(--font-sans);
+  font-size: .92rem;
+}
+
+.footer-link {
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  color: var(--ink-3);
+  transition: color var(--transition);
+}
+
+.footer-link:hover { color: var(--primary); text-decoration: none; }
+
+.footer-icon { display: block; flex-shrink: 0; }
+
 .install-line {
   font-family: var(--font-mono);
   font-size: .88rem;
