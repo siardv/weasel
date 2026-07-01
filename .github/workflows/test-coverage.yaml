@@ -14,6 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
     steps:
       - uses: actions/checkout@v4
@@ -27,6 +28,8 @@ jobs:
           extra-packages: any::covr, any::xml2
           needs: coverage
 
+      # runs the full test suite under covr; a failing test fails this
+      # step, so the job gates regressions even without codecov
       - name: Test coverage
         run: |
           cov <- covr::package_coverage(
@@ -38,10 +41,13 @@ jobs:
           covr::to_cobertura(cov)
         shell: Rscript {0}
 
-      - uses: codecov/codecov-action@v4
+      # skipped until a CODECOV_TOKEN repository secret exists; once it
+      # does, uploads run and genuine upload failures fail the job
+      - name: Upload to Codecov
+        if: env.CODECOV_TOKEN != ''
+        uses: codecov/codecov-action@v4
         with:
-          # a CODECOV_TOKEN repository secret is required for uploads
-          fail_ci_if_error: ${{ github.event_name != 'pull_request' }}
+          fail_ci_if_error: true
           file: ./cobertura.xml
           disable_search: true
           token: ${{ secrets.CODECOV_TOKEN }}
