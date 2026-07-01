@@ -4,12 +4,16 @@
 \alias{weasel_apply}
 \title{Apply a scenario to obtain filtered long-format data}
 \usage{
-weasel_apply(plan_obj, scenario)
+weasel_apply(plan_obj, scenario, data = NULL)
 }
 \arguments{
 \item{plan_obj}{Object returned by \code{\link[=weasel_plan]{weasel_plan()}}.}
 
 \item{scenario}{Name (or unambiguous abbreviation) of the scenario.}
+
+\item{data}{Optional long-format data frame; defaults to the data
+attached to \code{plan_obj}. Required when the plan was created with
+\code{keep_data = FALSE}.}
 }
 \value{
 A data frame.
@@ -30,5 +34,9 @@ dim(balanced)
 # abbreviations work when unambiguous
 strict <- weasel_apply(p, "strict")
 dim(strict)
+
+# plans built with keep_data = FALSE need the data passed back in
+p2 <- weasel_plan(d, "id", "time", span = "core", keep_data = FALSE)
+nrow(weasel_apply(p2, "lenient", data = d))
 
 }

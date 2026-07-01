@@ -9,4 +9,6 @@
 ^.*\.Rcheck$
 ^README\.md$
 ^docs$
+^\.github$
+^LICENSE\.md$
 ^CITATION\.cff$

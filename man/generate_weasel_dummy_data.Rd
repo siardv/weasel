@@ -17,13 +17,15 @@ generate_weasel_dummy_data(
   block_duration_range = c(2, 4),
   prop_item_missing = 0.02,
   id_start = 800001,
+  waves = NULL,
   seed = NULL
 )
 }
 \arguments{
 \item{n_ids}{Number of respondents.}
 
-\item{n_times}{Number of time points (waves).}
+\item{n_times}{Number of time points (waves). Ignored when \code{waves}
+is supplied.}
 
 \item{n_vars}{Number of outcome variables to generate.}
 
@@ -33,8 +35,8 @@ observation is skipped at random.}
 \item{prop_attention}{Asymptotic probability of attention-related
 wave skipping at late waves.}
 
-\item{attention_center}{Wave at which the attention-decay curve is
-centred.}
+\item{attention_center}{Wave position at which the attention-decay
+curve is centred.}
 
 \item{attention_scale}{Steepness of the attention-decay curve;
 larger values give a more gradual increase.}
@@ -52,6 +54,13 @@ min/max duration of block missingness.}
 on an observed row is \code{NA} (item nonresponse).}
 
 \item{id_start}{Starting integer for respondent identifiers.}
+
+\item{waves}{Optional integer vector of wave labels, for example
+\code{seq(2008, 2032, by = 2)} for a biennial schedule. When supplied it
+overrides \code{n_times}; the participation mechanisms operate on the
+positions of this schedule, and the returned \code{time} column contains
+these labels. Analyse such data with \code{grid = "observed"} in
+\code{\link[=weasel_plan]{weasel_plan()}} or \code{\link[=set_weasel_scope]{set_weasel_scope()}}.}
 
 \item{seed}{Random seed. If \code{NULL}, a seed is drawn and reported so
 the data set can be regenerated.}
@@ -89,5 +98,10 @@ weasel_clear_scope()
 
 # plan pipeline starts here
 p <- weasel_plan(d, "id", "time", span = "core")
+
+# a biennial schedule; analyse with grid = "observed"
+b <- generate_weasel_dummy_data(n_ids = 40, waves = seq(2008, 2020, 2),
+                                seed = 1)
+pb <- weasel_plan(b, "id", "time", span = "full", grid = "observed")
 
 }

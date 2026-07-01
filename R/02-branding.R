@@ -1,5 +1,6 @@
 # console branding helpers
-# only logo() is exported; everything else is internal cosmetics
+# only weasel_logo() (and its deprecated alias) is exported; everything
+# else is internal cosmetics
 
 .weasel_palette <- c("green", "red", "yellow", "blue", "magenta", "cyan")
 
@@ -72,10 +73,10 @@ weasel_text <- function(pre = NULL, post = NULL, not_first = "green") {
 #' @return `NULL`, invisibly.
 #'
 #' @examples
-#' logo()
+#' weasel_logo()
 #'
 #' @export
-logo <- function() {
+weasel_logo <- function() {
   layers <- list(
     " ._      __ ;.___ ;.__ ;  .___;  .___ ;._",
     " | | /| / /;/___/;/ _ |; / __/; /___/;/ /",
@@ -83,4 +84,11 @@ logo <- function() {
     " |__/|__/;/___/;/_/ |_|;/___/;/___/;/____/ "
   )
   colorize_output(layers, ascii = TRUE, version = TRUE, save = FALSE)
+}
+
+#' @rdname weasel-deprecated
+#' @export
+logo <- function(...) {
+  .weasel_deprecate("logo", "weasel_logo")
+  weasel_logo(...)
 }

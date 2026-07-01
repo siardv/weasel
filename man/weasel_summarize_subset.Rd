@@ -19,7 +19,8 @@ weasel_summarize_subset(
 \item{scenario}{Name of the scenario to summarize.}
 
 \item{data}{Optional long-format data frame; defaults to the data
-attached to \code{plan_obj}.}
+attached to \code{plan_obj}. Required when the plan was created with
+\code{keep_data = FALSE}.}
 
 \item{id}{Optional id column name; defaults to \code{plan_obj$id}.}
 

@@ -2,7 +2,7 @@
 % Please edit documentation in R/05-scope.R
 \name{evaluate_weasel_scope}
 \alias{evaluate_weasel_scope}
-\title{Evaluate wave bounds and valid window sizes}
+\title{Evaluate wave bounds, grid, and valid window sizes}
 \usage{
 evaluate_weasel_scope()
 }
@@ -10,9 +10,12 @@ evaluate_weasel_scope()
 The scope environment, invisibly.
 }
 \description{
-Finalises \code{lower}, \code{upper}, and \code{size} within the active scope.
-Called automatically by \code{\link[=reshape_to_wide]{reshape_to_wide()}}, but can be run
-explicitly to inspect bounds before reshaping.
+Finalises \code{lower}, \code{upper}, the wave grid, and \code{size} within the
+active scope. Called automatically by \code{\link[=weasel_reshape_to_wide]{weasel_reshape_to_wide()}}, but
+can be run explicitly to inspect bounds before reshaping. With
+\code{grid = "consecutive"}, a warning (class \code{weasel_empty_waves}) is
+issued once per scope when the span contains waves that no respondent
+has, since such waves count as missed by everyone.
 }
 \examples{
 d <- generate_weasel_dummy_data(n_ids = 50, n_times = 8, seed = 1)

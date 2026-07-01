@@ -10,12 +10,13 @@ weasel_example(seed = 42)
 \item{seed}{Random seed passed to \code{\link[=generate_weasel_dummy_data]{generate_weasel_dummy_data()}}.}
 }
 \value{
-A list with elements \code{data}, \code{plan}, \code{compare}, and
-\code{summary}, invisibly.
+A list with elements \code{data}, \code{plan}, \code{compare}, \code{summary},
+and \code{sensitivity}, invisibly.
 }
 \description{
 Exercises both the scope-based pipeline and the planning interface on
-synthetic dummy data, then cleans up the scope.
+synthetic dummy data, including the sensitivity diagnostic, then
+cleans up the scope.
 }
 \examples{
 \dontrun{

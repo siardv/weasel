@@ -1,7 +1,7 @@
 Package: weasel
 Type: Package
 Title: Wave-Based Extraction and Selection for Longitudinal Data
-Version: 0.2.0
+Version: 0.3.0
 Authors@R:
     person("Siard", "van den Bosch", , "siardvandenbosch@me.com",
            role = c("aut", "cre", "cph"))
@@ -9,10 +9,13 @@ Description: Tools for selecting, filtering, and balancing longitudinal
     panel data across survey waves. Provides a scope-based pipeline for
     wave pattern analysis and a planning interface for scenario-based
     respondent selection with configurable missingness tolerances,
-    interior-gap constraints, and endpoint requirements, plus a generator
-    of ready-to-paste methods-section justification text.
+    interior-gap constraints, and endpoint requirements. Wave grids may
+    be consecutive integers or the observed schedule (e.g. biennial
+    panels). Includes tolerance-sensitivity and attrition-selectivity
+    diagnostics, plus a generator of ready-to-paste methods-section
+    justification text.
 License: MIT + file LICENSE
-URL: https://github.com/siardv/weasel
+URL: https://github.com/siardv/weasel, https://siardv.github.io/weasel/
 BugReports: https://github.com/siardv/weasel/issues
 Encoding: UTF-8
 Depends:

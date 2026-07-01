@@ -4,7 +4,25 @@
 # package-internal state container (replaces the former global weasel_env)
 the <- new.env(parent = emptyenv())
 
-.weasel_stop <- function(...) stop(paste0(...), call. = FALSE)
+# classed error so callers can handle weasel failures programmatically,
+# e.g. tryCatch(..., weasel_error = function(e) ...)
+.weasel_stop <- function(..., class = NULL) {
+  stop(errorCondition(paste0(...), class = c(class, "weasel_error"),
+                      call = NULL))
+}
+
+# classed warning; always a real warning condition so behaviour does not
+# depend on which optional packages are installed
+.weasel_warn <- function(..., class = NULL) {
+  warning(warningCondition(paste0(...), class = c(class, "weasel_warning"),
+                           call = NULL))
+}
+
+# deprecation warning used by the renamed and legacy functions
+.weasel_deprecate <- function(old, new) {
+  .weasel_warn(old, "() is deprecated; use ", new, "() instead.",
+               class = "weasel_deprecated")
+}
 
 .weasel_is_installed <- function(pkg) requireNamespace(pkg, quietly = TRUE)
 
@@ -26,10 +44,6 @@ the <- new.env(parent = emptyenv())
   invisible(NULL)
 }
 
-# always raises a real warning condition so behaviour does not depend on
-# which optional packages are installed
-.weasel_warn <- function(...) warning(paste0(...), call. = FALSE)
-
 .weasel_h2 <- function(text) {
   if (!.weasel_verbose()) return(invisible(NULL))
   if (.weasel_cli()) {
@@ -42,6 +56,9 @@ the <- new.env(parent = emptyenv())
   invisible(NULL)
 }
 
+# null-default helper
+.weasel_or <- function(a, b) if (is.null(a)) b else a
+
 # integer sequence that never counts downwards: a > b yields integer(0)
 .weasel_seq_int <- function(a, b) {
   a <- as.integer(a)
@@ -50,6 +67,24 @@ the <- new.env(parent = emptyenv())
 }
 
 .weasel_unique_int <- function(x) sort(unique(as.integer(x[!is.na(x)])))
+
+# single non-negative integer or NULL
+.weasel_check_count <- function(x, name) {
+  if (is.null(x)) return(NULL)
+  x <- suppressWarnings(as.integer(x[1]))
+  if (is.na(x) || x < 0) {
+    .weasel_stop(name, " must be a single non-negative integer.")
+  }
+  x
+}
+
+# single integer bound (any sign) or NULL
+.weasel_check_bound <- function(x, name) {
+  if (is.null(x)) return(NULL)
+  x <- suppressWarnings(as.integer(round(as.numeric(x[1]))))
+  if (is.na(x)) .weasel_stop(name, " must be a single number.")
+  x
+}
 
 # validate a wave column: must be numeric and integer-valued
 # returns the sorted unique integer waves
@@ -82,6 +117,71 @@ the <- new.env(parent = emptyenv())
   invisible(.weasel_check_wave(data[[wave]], wave))
 }
 
+# sorted index of the unique (id, wave) pairs plus the duplicate count;
+# a single order() pass, much faster on large panels than the
+# paste-based unique()/duplicated() methods for data frames
+.weasel_dedup_index <- function(id_vec, wave_vec) {
+  o <- order(id_vec, wave_vec)
+  n <- length(o)
+  if (n <= 1L) return(list(idx = o, n_dup = 0L))
+  a <- id_vec[o]
+  b <- wave_vec[o]
+  dup <- c(FALSE, a[-1L] == a[-n] & b[-1L] == b[-n])
+  list(idx = o[!dup], n_dup = as.integer(sum(dup, na.rm = TRUE)))
+}
+
+# warn about duplicated (id, wave) rows; duplicates usually indicate a
+# join or merge problem, and both pipelines count each pair once
+.weasel_warn_duplicates <- function(n_dup, id, wave) {
+  if (n_dup > 0) {
+    .weasel_warn(
+      n_dup, " duplicated (", id, ", ", wave, ") row(s) found; each pair ",
+      "is counted once. duplicates often indicate a join or merge ",
+      "problem worth checking.",
+      class = "weasel_duplicates"
+    )
+  }
+  invisible(n_dup)
+}
+
+.weasel_check_duplicates <- function(data, id, wave) {
+  dd <- .weasel_dedup_index(data[[id]], data[[wave]])
+  .weasel_warn_duplicates(dd$n_dup, id, wave)
+}
+
+# resolve the wave grid over which presence is evaluated:
+# "consecutive" treats every integer in lower:upper as a scheduled wave;
+# "observed" uses only wave values that occur anywhere in the data,
+# which suits biennial and other non-consecutive schedules
+.weasel_grid_waves <- function(observed_waves, lower, upper, grid) {
+  span <- if (grid == "observed") {
+    observed_waves[observed_waves >= lower & observed_waves <= upper]
+  } else {
+    .weasel_seq_int(lower, upper)
+  }
+  if (length(span) == 0) .weasel_stop("the selected span contains no waves.")
+  span
+}
+
+# warn when a consecutive span contains waves that no respondent has:
+# every such wave counts as missed by everyone, which usually means the
+# schedule is non-consecutive and grid = "observed" is the right choice
+.weasel_warn_empty_span <- function(span, observed_waves) {
+  empty <- setdiff(span, observed_waves)
+  if (length(empty) == 0) return(invisible(0L))
+  shown <- paste(utils::head(empty, 5), collapse = ", ")
+  if (length(empty) > 5) shown <- paste0(shown, ", ...")
+  .weasel_warn(
+    length(empty), " of ", length(span), " wave(s) in the span ",
+    span[1], ":", span[length(span)],
+    " have no observations for any respondent (", shown, "); they count ",
+    "as missed by everyone. if waves are non-consecutive by design ",
+    "(e.g. biennial), use grid = \"observed\".",
+    class = "weasel_empty_waves"
+  )
+  invisible(length(empty))
+}
+
 # validate a custom scenario table for weasel_plan()
 .weasel_check_scenarios <- function(scenarios) {
   required <- c("scenario", "require_endpoints", "max_missing",
@@ -100,11 +200,13 @@ the <- new.env(parent = emptyenv())
   }
   if (anyDuplicated(s$scenario)) .weasel_stop("scenario names must be unique.")
   s$require_endpoints <- as.logical(s$require_endpoints)
+  if (anyNA(s$require_endpoints)) {
+    .weasel_stop("scenario column 'require_endpoints' must not contain NA.")
+  }
   for (nm in c("max_missing", "n_gap_max", "max_gap_max")) {
     s[[nm]] <- suppressWarnings(as.numeric(s[[nm]]))
-    if (anyNA(s[[nm]]) || anyNA(s$require_endpoints)) {
-      .weasel_stop("scenario column '", nm,
-                   "' (and require_endpoints) must not contain NA.")
+    if (anyNA(s[[nm]])) {
+      .weasel_stop("scenario column '", nm, "' must not contain NA.")
     }
     if (any(s[[nm]] < 0)) .weasel_stop("scenario column '", nm, "' must be >= 0.")
   }
@@ -113,6 +215,7 @@ the <- new.env(parent = emptyenv())
 
 # run-length gap metrics over the full presence vector
 # a gap is any maximal run of FALSE, including leading/trailing runs
+# (reference implementation; the pipelines use .weasel_gap_metrics)
 .weasel_rle_gaps <- function(present_logical) {
   if (length(present_logical) == 0) {
     return(list(n_gap = 0L, max_gap = 0L, n_present = 0L))
@@ -130,6 +233,7 @@ the <- new.env(parent = emptyenv())
 
 # interior gap metrics: runs of FALSE strictly between the first and last
 # TRUE; leading/trailing absence is entry/exit, not a gap
+# (reference implementation; the pipelines use .weasel_gap_metrics)
 .weasel_interior_gaps <- function(present_logical) {
   n_present <- as.integer(sum(present_logical))
   if (n_present == 0L) {
@@ -139,6 +243,83 @@ the <- new.env(parent = emptyenv())
   core <- present_logical[idx[1]:idx[length(idx)]]
   g <- .weasel_rle_gaps(core)
   list(n_gap = g$n_gap, max_gap = g$max_gap, n_present = n_present)
+}
+
+# vectorized per-respondent presence metrics from long-format positions;
+# equivalent to applying .weasel_interior_gaps row by row, but a single
+# ordered pass over the observations instead of one rle() per respondent
+# id_vec:  respondent id per deduplicated observation (any atomic type)
+# pos_vec: integer grid position in 1..L
+# returns one row per id, ids sorted ascending
+.weasel_gap_metrics <- function(id_vec, pos_vec, L) {
+  if (length(id_vec) == 0) {
+    return(data.frame(
+      id = id_vec, n_present = integer(0),
+      has_lower = logical(0), has_upper = logical(0),
+      n_gap = integer(0), max_gap = integer(0),
+      stringsAsFactors = FALSE
+    ))
+  }
+
+  o     <- order(id_vec, pos_vec)
+  ids_o <- id_vec[o]
+  pos_o <- pos_vec[o]
+
+  new_id <- c(TRUE, ids_o[-1L] != ids_o[-length(ids_o)])
+  grp    <- cumsum(new_id)
+  n_ids  <- grp[length(grp)]
+
+  n_present <- tabulate(grp, nbins = n_ids)
+  has_lower <- tabulate(grp[pos_o == 1L], nbins = n_ids) > 0L
+  has_upper <- tabulate(grp[pos_o == L],  nbins = n_ids) > 0L
+
+  n_gap   <- integer(n_ids)
+  max_gap <- integer(n_ids)
+  if (length(pos_o) > 1L) {
+    gap_len <- diff(pos_o) - 1L
+    gap_len[new_id[-1L]] <- 0L
+    idx <- which(gap_len > 0L)
+    if (length(idx) > 0L) {
+      g_grp <- grp[-1L][idx]
+      g_val <- gap_len[idx]
+      n_gap <- tabulate(g_grp, nbins = n_ids)
+      o2    <- order(g_grp, g_val)
+      last  <- !duplicated(g_grp[o2], fromLast = TRUE)
+      max_gap[g_grp[o2][last]] <- g_val[o2][last]
+    }
+  }
+
+  data.frame(
+    id        = ids_o[new_id],
+    n_present = as.integer(n_present),
+    has_lower = has_lower,
+    has_upper = has_upper,
+    n_gap     = as.integer(n_gap),
+    max_gap   = as.integer(max_gap),
+    stringsAsFactors = FALSE
+  )
+}
+
+# shared validation for plan objects
+.weasel_check_plan <- function(plan_obj) {
+  if (!is.list(plan_obj) || is.null(plan_obj$plan) ||
+      !inherits(plan_obj$plan, "data.frame")) {
+    .weasel_stop("plan_obj must be the output of weasel_plan().",
+                 class = "weasel_error_plan")
+  }
+  if (!("scenario" %in% names(plan_obj$plan))) {
+    .weasel_stop("plan_obj$plan must contain a 'scenario' column.",
+                 class = "weasel_error_plan")
+  }
+  invisible(plan_obj)
+}
+
+# grid waves of a plan, with a fallback for objects saved by older
+# versions that only stored the bounds
+.weasel_plan_span <- function(plan_obj, row) {
+  sp <- plan_obj$span
+  if (!is.null(sp)) return(as.integer(sp))
+  .weasel_seq_int(row$lower[[1]], row$upper[[1]])
 }
 
 .weasel_format_num <- function(x, digits = 3) {
@@ -166,3 +347,24 @@ the <- new.env(parent = emptyenv())
   }, add = TRUE)
   expr
 }
+
+#' Deprecated functions
+#'
+#' These earlier names are kept so existing scripts keep running, but they
+#' now emit a deprecation warning (class `weasel_deprecated`) and forward
+#' to their replacements. They will be removed in a future release.
+#'
+#' * `reshape_to_wide()` -> [weasel_reshape_to_wide()]
+#' * `summarize_waves()` -> [weasel_summarize_waves()]
+#' * `filter_wave_summary()` -> [weasel_filter_wave_summary()]
+#' * `get_data_by_row()` -> [weasel_get_data_by_row()]
+#' * `logo()` -> [weasel_logo()]
+#' * `generate_sets()` and `filter_sets()` remain no-ops (see
+#'   [evaluate_weasel_scope()]) and now warn as well.
+#'
+#' @param ... Arguments passed on to the replacement function.
+#'
+#' @return The value of the corresponding replacement function.
+#' @name weasel-deprecated
+#' @keywords internal
+NULL

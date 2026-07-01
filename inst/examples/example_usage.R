@@ -21,18 +21,18 @@ set_weasel_scope(
   gap = 2      # drop respondents with any interior gap longer than 2 waves
 )
 evaluate_weasel_scope()
-reshape_to_wide()
-summarize_waves()
+weasel_reshape_to_wide()
+weasel_summarize_waves()
 
 # inspect patterns: n = observed waves in the pattern, ids = respondents
-weasel_print_table(filter_wave_summary(), title = "All patterns", n = 15)
+weasel_print_table(weasel_filter_wave_summary(), title = "All patterns", n = 15)
 weasel_print_table(
-  filter_wave_summary(n_range = c(8, 10), ids_range = c(5, Inf)),
+  weasel_filter_wave_summary(n_range = c(8, 10), ids_range = c(5, Inf)),
   title = "Dense patterns shared by 5+ respondents"
 )
 
 # pull the long-format rows behind the most common pattern
-subset_row1 <- get_data_by_row(1)
+subset_row1 <- weasel_get_data_by_row(1)
 weasel_print_table(head(subset_row1, 10), title = "Row 1 subset preview")
 
 weasel_clear_scope()

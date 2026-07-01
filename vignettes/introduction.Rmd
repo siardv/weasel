@@ -78,8 +78,15 @@ set_weasel_scope(
   upper = 11
 )
 evaluate_weasel_scope()
-reshape_to_wide()
-summarize_waves()
+weasel_reshape_to_wide()
+weasel_summarize_waves()
+```
+
+At any point, `weasel_scope_info()` shows what the scope contains and
+how far the pipeline has progressed:
+
+```{r}
+weasel_scope_info()
 ```
 
 The pattern summary groups respondents by their participation pattern.
@@ -88,24 +95,26 @@ In the table, `waves` shows the pattern (a `.` marks a missing wave),
 the respondents who share it:
 
 ```{r}
-weasel_print_table(filter_wave_summary(), title = "Wave patterns", n = 10)
+weasel_print_table(weasel_filter_wave_summary(),
+                   title = "Wave patterns", n = 10)
 ```
 
-`filter_wave_summary()` narrows the table. For instance, patterns with
-at least 9 observed waves that are shared by at least 5 respondents:
+`weasel_filter_wave_summary()` narrows the table. For instance,
+patterns with at least 9 observed waves that are shared by at least 5
+respondents:
 
 ```{r}
 weasel_print_table(
-  filter_wave_summary(n_range = c(9, 10), ids_range = c(5, Inf)),
+  weasel_filter_wave_summary(n_range = c(9, 10), ids_range = c(5, Inf)),
   title = "Dense, common patterns"
 )
 ```
 
-`get_data_by_row()` then pulls the original long-format rows behind any
-pattern row, ready for analysis:
+`weasel_get_data_by_row()` then pulls the original long-format rows
+behind any pattern row (or several rows at once), ready for analysis:
 
 ```{r}
-subset_row1 <- get_data_by_row(1)
+subset_row1 <- weasel_get_data_by_row(1)
 weasel_print_table(head(subset_row1, 8), title = "Most common pattern, data")
 ```
 
@@ -117,9 +126,10 @@ and `n_gap` limits how many such gaps are allowed:
 ```{r}
 set_weasel_scope(long_data, "id", "time", gap = 1, n_gap = 1)
 evaluate_weasel_scope()
-reshape_to_wide()
-summarize_waves()
-weasel_print_table(filter_wave_summary(), title = "Gap-constrained", n = 5)
+weasel_reshape_to_wide()
+weasel_summarize_waves()
+weasel_print_table(weasel_filter_wave_summary(),
+                   title = "Gap-constrained", n = 5)
 ```
 
 When you are done, clear the scope:
@@ -142,6 +152,7 @@ evaluates three defaults:
 
 ```{r}
 plan_obj <- weasel_plan(long_data, id = "id", wave = "time", span = "core")
+plan_obj
 ```
 
 With `span = "core"` the package slides a window of `core_len`
@@ -189,4 +200,5 @@ cat(weasel_justify_subset(plan_obj, "anchored_balanced"), "\n")
 ```
 
 See the "Advanced usage" vignette for custom scenarios, scoring
-weights, and writing style options.
+weights, non-consecutive wave schedules (biennial panels), the
+sensitivity and selectivity diagnostics, and writing style options.

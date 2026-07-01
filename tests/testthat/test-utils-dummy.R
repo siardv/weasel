@@ -15,11 +15,53 @@ test_that("interior gap metrics ignore leading/trailing absence", {
   expect_equal(g2$n_gap, 3L)
 })
 
+test_that("vectorized gap metrics match the rle reference implementation", {
+  set.seed(99)
+  for (rep in 1:5) {
+    n <- 40L
+    L <- 12L
+    m <- matrix(runif(n * L) < 0.6, n, L)
+    for (r in which(rowSums(m) == 0L)) m[r, sample.int(L, 1)] <- TRUE
+
+    ref <- t(vapply(seq_len(n), function(r) {
+      g <- weasel:::.weasel_interior_gaps(m[r, ])
+      c(g$n_present, g$n_gap, g$max_gap)
+    }, numeric(3)))
+
+    idx <- which(m, arr.ind = TRUE)
+    got <- weasel:::.weasel_gap_metrics(idx[, 1], idx[, 2], L)
+    got <- got[order(got$id), ]
+
+    expect_equal(got$id, seq_len(n))
+    expect_equal(got$n_present, as.integer(ref[, 1]))
+    expect_equal(got$n_gap, as.integer(ref[, 2]))
+    expect_equal(got$max_gap, as.integer(ref[, 3]))
+    expect_equal(got$has_lower, unname(m[, 1]))
+    expect_equal(got$has_upper, unname(m[, L]))
+  }
+
+  # empty input yields an empty, well-formed frame
+  e <- weasel:::.weasel_gap_metrics(integer(0), integer(0), 5L)
+  expect_equal(nrow(e), 0L)
+  expect_true(all(c("n_present", "n_gap", "max_gap") %in% names(e)))
+})
+
 test_that("wave column validation rejects factors and non-integers", {
   expect_error(weasel:::.weasel_check_wave(factor(1:3)), "factor")
   expect_error(weasel:::.weasel_check_wave(c(1, 2.5)), "integer-valued")
   expect_error(weasel:::.weasel_check_wave(letters[1:3]), "numeric")
   expect_identical(weasel:::.weasel_check_wave(c(3, 1, 2, NA)), 1:3)
+})
+
+test_that("weasel errors and warnings are classed conditions", {
+  err <- tryCatch(weasel:::.weasel_check_wave(letters[1:3]),
+                  error = function(e) e)
+  expect_s3_class(err, "weasel_error")
+
+  wrn <- tryCatch(weasel:::.weasel_warn("hello", class = "weasel_test"),
+                  warning = function(w) w)
+  expect_s3_class(wrn, "weasel_warning")
+  expect_s3_class(wrn, "weasel_test")
 })
 
 test_that("dummy data has genuine wave-level (row) missingness", {
@@ -45,6 +87,23 @@ test_that("dummy data is reproducible and RNG-neutral", {
   invisible(generate_weasel_dummy_data(n_ids = 10, n_times = 5, seed = 1))
   x2 <- rnorm(3)
   expect_identical(x1, x2)
+})
+
+test_that("dummy data supports explicit wave schedules", {
+  sched <- seq(2008L, 2020L, by = 2L)
+  b <- generate_weasel_dummy_data(n_ids = 25, waves = sched, seed = 3)
+  expect_true(all(unique(b$time) %in% sched))
+  expect_equal(length(unique(b$id)), 25)
+
+  # positions map to labels: same seed, same participation pattern
+  ref <- generate_weasel_dummy_data(n_ids = 25, n_times = length(sched),
+                                    seed = 3)
+  expect_identical(sched[match(ref$time, seq_along(sched))], b$time)
+
+  p <- weasel_plan(b, "id", "time", span = "full", grid = "observed")
+  expect_equal(p$span, sched)
+
+  expect_error(generate_weasel_dummy_data(waves = c(1, 2)), "more than 2")
 })
 
 test_that("dummy data validates its arguments", {

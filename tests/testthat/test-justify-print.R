@@ -39,6 +39,9 @@ test_that("weasel_print_table hides list columns, rounds, and truncates", {
   expect_true(any(grepl("list column", out_txt)))
 
   expect_error(weasel_print_table(1:3), "data.frame")
+  expect_error(weasel_print_table(df, n = NA), "non-negative")
+  expect_error(weasel_print_table(df, n = -1), "non-negative")
+  expect_error(weasel_print_table(df, digits = NA), "non-negative")
 })
 
 test_that("compare sentence mentions the recommended scenario", {
@@ -57,4 +60,6 @@ test_that("scenario matching accepts unambiguous abbreviations only", {
   expect_equal(weasel_match_scenario("anchored_strict", choices),
                "anchored_strict")
   expect_error(weasel_match_scenario("anchored", choices), "ambiguous")
+  expect_error(weasel_match_scenario("anchored", choices),
+               class = "weasel_error_scenario")
 })

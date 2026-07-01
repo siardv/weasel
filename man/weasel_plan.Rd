@@ -10,12 +10,15 @@ weasel_plan(
   wave,
   span = c("core", "full"),
   core_len = 6L,
-  scenarios = NULL
+  scenarios = NULL,
+  grid = c("consecutive", "observed"),
+  keep_data = TRUE
 )
 }
 \arguments{
 \item{data}{A long-format data frame. A respondent is considered
-observed at a wave if a row with that (id, wave) pair exists.}
+observed at a wave if a row with that (id, wave) pair exists.
+Duplicated (id, wave) rows are counted once and trigger a warning.}
 
 \item{id}{Name of the respondent-identifier column. Any atomic type
 is supported.}
@@ -24,7 +27,7 @@ is supported.}
 integer-valued entries.}
 
 \item{span}{Either \code{"core"} (highest-coverage window of \code{core_len}
-consecutive waves) or \code{"full"} (all waves).}
+consecutive grid waves) or \code{"full"} (all waves).}
 
 \item{core_len}{Integer; desired window length when \code{span = "core"}.}
 
@@ -32,29 +35,54 @@ consecutive waves) or \code{"full"} (all waves).}
 columns \code{scenario}, \code{require_endpoints}, \code{max_missing},
 \code{n_gap_max}, \code{max_gap_max}. The table is validated; missing
 columns raise an error.}
+
+\item{grid}{How the wave grid inside the span is defined.
+\code{"consecutive"} (default) treats every integer between the span
+bounds as a scheduled wave; \code{"observed"} uses only wave values
+that occur anywhere in the data, which is the right choice for
+biennial and other non-consecutive schedules. With
+\code{"consecutive"}, a warning (class \code{weasel_empty_waves}) is issued
+when the chosen span contains waves that no respondent has, since
+such waves count as missed by everyone.}
+
+\item{keep_data}{If \code{TRUE} (default), the original data is attached
+to the returned object so that \code{\link[=weasel_apply]{weasel_apply()}},
+\code{\link[=weasel_summarize_subset]{weasel_summarize_subset()}}, and \code{\link[=weasel_selectivity]{weasel_selectivity()}} can reuse
+it. Set to \code{FALSE} to keep the plan object small (for example
+before saving it with \code{saveRDS()}); those functions then need the
+data passed back in through their \code{data} argument.}
 }
 \value{
-A list with elements \code{plan} (scored scenario table),
-\code{id_metrics}, \code{lower}, \code{upper}, \code{span_reason}, \code{id}, and \code{wave}.
-The original \code{data} is attached as an attribute.
+A list of class \code{weasel_plan} with elements \code{plan} (scored
+scenario table), \code{id_metrics}, \code{lower}, \code{upper}, \code{span} (integer
+vector of grid waves), \code{grid}, \code{span_reason}, \code{id}, and \code{wave}.
+When \code{keep_data = TRUE} the original \code{data} is attached as an
+attribute. Printing the object shows a compact summary instead of
+the raw list.
 }
 \description{
 Evaluates three default scenarios (\code{anchored_strict},
 \code{anchored_balanced}, \code{lenient_info_max}) or a validated custom
 scenario table against the data, computing per-scenario respondent
 counts and observed quality metrics. Gap constraints refer to
-interior gaps: runs of missing waves strictly between a respondent's
-first and last observed wave inside the span; missing endpoints are
-handled separately through \code{require_endpoints}.
+interior gaps: runs of missing grid waves strictly between a
+respondent's first and last observed wave inside the span; missing
+endpoints are handled separately through \code{require_endpoints}.
 }
 \examples{
 d <- generate_weasel_dummy_data(n_ids = 100, n_times = 10, seed = 1)
 p <- weasel_plan(d, id = "id", wave = "time", span = "core")
+p
 
 cmp <- weasel_compare_scenarios(p)
 weasel_print_table(cmp, title = "Scenario overview")
 
 sub <- weasel_apply(p, "anchored_balanced")
 dim(sub)
+
+# biennial schedule: evaluate presence on the observed grid
+b <- generate_weasel_dummy_data(n_ids = 60, waves = seq(2008, 2020, 2),
+                                seed = 1)
+pb <- weasel_plan(b, "id", "time", span = "full", grid = "observed")
 
 }

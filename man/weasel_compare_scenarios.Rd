@@ -11,7 +11,7 @@ weasel_compare_scenarios(plan_obj, weights = NULL)
 as returned by \code{\link[=weasel_plan]{weasel_plan()}}.}
 
 \item{weights}{Named numeric vector overriding any of the default
-weights \code{c(coverage = 2, endpoints = 1.2, size = 0.8, missing = 0.6, gaps = 0.4)}.}
+weights \code{c(coverage = 2, endpoints = 1.2, size = 0.8, missing = 0.6, gaps = 0.4)}. \code{NA} values are rejected.}
 }
 \value{
 The plan data frame with added \code{score} and \code{recommended}

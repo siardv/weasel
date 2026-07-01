@@ -167,19 +167,19 @@ const TREE = {
         note: "resolve lower and upper bounds from the data; inspect them before pivoting if needed",
       },
       {
-        fn: "reshape_to_wide()",
+        fn: "weasel_reshape_to_wide()",
         note: "pivot from long to a respondent by wave presence matrix; respondents with too few observed waves are dropped",
       },
       {
-        fn: "summarize_waves()",
+        fn: "weasel_summarize_waves()",
         note: "group respondents by their wave fingerprint and count how many share each pattern",
       },
       {
-        fn: "filter_wave_summary()",
+        fn: "weasel_filter_wave_summary()",
         note: "inspect the pattern table; use `ids_range = c(N, Inf)` to focus on frequent patterns",
       },
       {
-        fn: "get_data_by_row(i)",
+        fn: "weasel_get_data_by_row(i)",
         note: "extract long-format data for every respondent matching pattern row i",
       },
     ],
@@ -187,12 +187,12 @@ const TREE = {
 
 set_weasel_scope(d, "id", "time")
 evaluate_weasel_scope()
-reshape_to_wide()
-summarize_waves()
+weasel_reshape_to_wide()
+weasel_summarize_waves()
 
-weasel_print_table(filter_wave_summary(), title = "Wave patterns")
+weasel_print_table(weasel_filter_wave_summary(), title = "Wave patterns")
 
-subset1 <- get_data_by_row(1)
+subset1 <- weasel_get_data_by_row(1)
 head(subset1)`,
     note:
       "In the pattern table, `waves` is the participation fingerprint (a '.' marks a missing " +
@@ -221,17 +221,17 @@ head(subset1)`,
         fn: "evaluate_weasel_scope()",
         note: "finalise and validate the declared bounds",
       },
-      { fn: "reshape_to_wide()", note: "build the restricted presence matrix" },
+      { fn: "weasel_reshape_to_wide()", note: "build the restricted presence matrix" },
       {
-        fn: "summarize_waves()",
+        fn: "weasel_summarize_waves()",
         note: "enumerate distinct participation patterns within the window",
       },
       {
-        fn: "filter_wave_summary(ids_range = c(5, Inf))",
+        fn: "weasel_filter_wave_summary(ids_range = c(5, Inf))",
         note: "optional: show only patterns shared by at least 5 respondents",
       },
       {
-        fn: "get_data_by_row(i)",
+        fn: "weasel_get_data_by_row(i)",
         note: "retrieve long-format data for the selected pattern row",
       },
     ],
@@ -239,15 +239,15 @@ head(subset1)`,
 
 set_weasel_scope(d, "id", "time", upper = 10)
 evaluate_weasel_scope()
-reshape_to_wide()
-summarize_waves()
+weasel_reshape_to_wide()
+weasel_summarize_waves()
 
 weasel_print_table(
-  filter_wave_summary(ids_range = c(5, Inf)),
+  weasel_filter_wave_summary(ids_range = c(5, Inf)),
   title = "Common patterns (n >= 5)"
 )
 
-subset1 <- get_data_by_row(1)`,
+subset1 <- weasel_get_data_by_row(1)`,
     note:
       "`gap` and `n_gap` are accepted by `set_weasel_scope()` but are inert in the Scope " +
       "pipeline: every respondent observed at the minimum number of waves is retained, " +
@@ -283,19 +283,19 @@ subset1 <- get_data_by_row(1)`,
         note: "resolve bounds and valid window sizes",
       },
       {
-        fn: "reshape_to_wide()",
+        fn: "weasel_reshape_to_wide()",
         note: "pivot to the respondent by wave presence matrix",
       },
       {
-        fn: "summarize_waves()",
+        fn: "weasel_summarize_waves()",
         note: "enumerate participation patterns across respondents",
       },
       {
-        fn: "filter_wave_summary()",
+        fn: "weasel_filter_wave_summary()",
         note: "view the pattern table; try `ids_range = c(5, Inf)` to focus on common patterns",
       },
       {
-        fn: "get_data_by_row(1)",
+        fn: "weasel_get_data_by_row(1)",
         note: "extract long-format data for the most common pattern",
       },
     ],
@@ -310,15 +310,15 @@ d <- d[!is.na(d$var1), ]
 
 set_weasel_scope(d, "id", "time", upper = 10)
 evaluate_weasel_scope()
-reshape_to_wide()
-summarize_waves()
+weasel_reshape_to_wide()
+weasel_summarize_waves()
 
-weasel_print_table(filter_wave_summary(), title = "Wave patterns", n = 10)
+weasel_print_table(weasel_filter_wave_summary(), title = "Wave patterns", n = 10)
 
-subset1 <- get_data_by_row(1)
+subset1 <- weasel_get_data_by_row(1)
 head(subset1)`,
     note:
-      "Without the focal-outcome step the synthetic grid is complete, so `summarize_waves()` " +
+      "Without the focal-outcome step the synthetic grid is complete, so `weasel_summarize_waves()` " +
       "returns a single all-observed pattern. Keying observation to `var1` exposes the " +
       "generator's attrition, block, and attention-decay missingness as genuine wave-level " +
       "patterns. With real data, where missed waves are already absent rows, this step is " +

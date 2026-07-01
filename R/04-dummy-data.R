@@ -14,14 +14,15 @@
 #' exit, and reproducibility is controlled through `seed`.
 #'
 #' @param n_ids Number of respondents.
-#' @param n_times Number of time points (waves).
+#' @param n_times Number of time points (waves). Ignored when `waves`
+#'   is supplied.
 #' @param n_vars Number of outcome variables to generate.
 #' @param prop_random Probability that any given (respondent, wave)
 #'   observation is skipped at random.
 #' @param prop_attention Asymptotic probability of attention-related
 #'   wave skipping at late waves.
-#' @param attention_center Wave at which the attention-decay curve is
-#'   centred.
+#' @param attention_center Wave position at which the attention-decay
+#'   curve is centred.
 #' @param attention_scale Steepness of the attention-decay curve;
 #'   larger values give a more gradual increase.
 #' @param prop_attrition Proportion of respondents who permanently drop
@@ -33,6 +34,12 @@
 #' @param prop_item_missing Probability that an individual outcome value
 #'   on an observed row is `NA` (item nonresponse).
 #' @param id_start Starting integer for respondent identifiers.
+#' @param waves Optional integer vector of wave labels, for example
+#'   `seq(2008, 2032, by = 2)` for a biennial schedule. When supplied it
+#'   overrides `n_times`; the participation mechanisms operate on the
+#'   positions of this schedule, and the returned `time` column contains
+#'   these labels. Analyse such data with `grid = "observed"` in
+#'   [weasel_plan()] or [set_weasel_scope()].
 #' @param seed Random seed. If `NULL`, a seed is drawn and reported so
 #'   the data set can be regenerated.
 #'
@@ -54,6 +61,11 @@
 #' # plan pipeline starts here
 #' p <- weasel_plan(d, "id", "time", span = "core")
 #'
+#' # a biennial schedule; analyse with grid = "observed"
+#' b <- generate_weasel_dummy_data(n_ids = 40, waves = seq(2008, 2020, 2),
+#'                                 seed = 1)
+#' pb <- weasel_plan(b, "id", "time", span = "full", grid = "observed")
+#'
 #' @importFrom stats runif rbinom rnorm
 #' @export
 generate_weasel_dummy_data <- function(n_ids = 1000,
@@ -68,7 +80,15 @@ generate_weasel_dummy_data <- function(n_ids = 1000,
                                        block_duration_range = c(2, 4),
                                        prop_item_missing = 0.02,
                                        id_start = 800001,
+                                       waves = NULL,
                                        seed = NULL) {
+  if (!is.null(waves)) {
+    waves <- .weasel_unique_int(waves)
+    if (length(waves) <= 2) {
+      .weasel_stop("waves must contain more than 2 distinct integer values.")
+    }
+    n_times <- length(waves)
+  }
   if (n_ids <= 0) .weasel_stop("n_ids must be > 0.")
   if (n_times <= 2) .weasel_stop("n_times must be > 2.")
   if (n_vars <= 0) .weasel_stop("n_vars must be > 0.")
@@ -133,6 +153,8 @@ generate_weasel_dummy_data <- function(n_ids = 1000,
       time = as.integer((obs - 1L) %% n_times + 1L),
       stringsAsFactors = FALSE
     )
+    # map schedule positions to the supplied wave labels
+    if (!is.null(waves)) data$time <- waves[data$time]
 
     # outcome variables on observed rows only
     var_generators <- list(

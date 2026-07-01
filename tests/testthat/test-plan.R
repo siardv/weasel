@@ -2,6 +2,7 @@ test_that("character ids survive the whole plan pipeline", {
   d <- make_fixture()
   p <- weasel_plan(d, "id", "time", span = "full")
 
+  expect_s3_class(p, "weasel_plan")
   expect_true(all(p$plan$n_ids >= 0))
   expect_gt(sum(p$plan$n_ids), 0)
 
@@ -66,6 +67,8 @@ test_that("scores are computed from observed outcomes with documented weights", 
                cmp2$scenario[which.max(cmp2$n_ids)])
   expect_error(weasel_compare_scenarios(p, weights = c(banana = 1)),
                "named vector")
+  expect_error(weasel_compare_scenarios(p, weights = c(size = NA)),
+               "must not contain NA")
 })
 
 test_that("empty scenarios get NA scores and are never recommended", {
@@ -87,11 +90,83 @@ test_that("empty scenarios get NA scores and are never recommended", {
 test_that("core span selection returns contiguous integer windows", {
   # waves 3 and 4 unobserved: a naive top-L pick would bridge the hole
   d <- expand.grid(id = 1:10, time = c(1, 2, 5, 6, 7, 8))
-  p <- weasel_plan(d, "id", "time", span = "core", core_len = 4)
+  # the chosen window avoids the hole, so no empty-wave warning fires
+  expect_no_warning(
+    p <- weasel_plan(d, "id", "time", span = "core", core_len = 4)
+  )
   expect_equal(p$upper - p$lower + 1L, 4L)
   # the best contiguous 4-wave window of observed coverage is 5:8
   expect_equal(p$lower, 5L)
   expect_equal(p$upper, 8L)
+})
+
+test_that("observed grids handle non-consecutive wave schedules", {
+  d <- expand.grid(id = 1:30, time = seq(2008, 2020, by = 2))
+
+  # the consecutive default warns and (correctly but uselessly) treats
+  # every skipped year as missed by everyone
+  expect_warning(p_bad <- weasel_plan(d, "id", "time", span = "full"),
+                 class = "weasel_empty_waves")
+  expect_equal(p_bad$plan$n_ids, rep(0L, 3))
+
+  # the observed grid recovers the real schedule
+  p <- weasel_plan(d, "id", "time", span = "full", grid = "observed")
+  expect_equal(p$span, seq(2008L, 2020L, by = 2L))
+  expect_equal(p$plan$L, rep(7L, 3))
+  expect_equal(p$plan$n_ids, rep(30L, 3))
+  expect_equal(p$id_metrics$n_gap, rep(0L, 30))
+  expect_true(all(p$id_metrics$prop_present == 1))
+
+  s <- weasel_summarize_subset(p, "anchored_strict")
+  expect_equal(nrow(s$per_wave_coverage), 7L)
+  expect_match(s$sentence, "observed waves")
+  txt <- weasel_justify_subset(p, "anchored_balanced")
+  expect_match(txt, "observed waves")
+
+  sub <- weasel_apply(p, "lenient")
+  expect_equal(nrow(sub), nrow(d))
+
+  # core windows slide over the observed schedule
+  pc <- weasel_plan(d, "id", "time", span = "core", core_len = 4,
+                    grid = "observed")
+  expect_equal(length(pc$span), 4L)
+  expect_true(all(diff(pc$span) == 2L))
+})
+
+test_that("plan objects print compactly and can drop the data", {
+  d <- make_fixture()
+  p <- weasel_plan(d, "id", "time", span = "full")
+
+  out <- capture.output(print(p))
+  expect_lt(length(out), 15)
+  expect_true(any(grepl("row(s) attached", out, fixed = TRUE)))
+  expect_true(any(grepl("anchored_strict", out)))
+  expect_false(any(grepl("var1", out)))  # the data itself is not dumped
+
+  p2 <- weasel_plan(d, "id", "time", span = "full", keep_data = FALSE)
+  expect_null(attr(p2, "data"))
+  expect_error(weasel_apply(p2, "lenient"), "keep_data")
+  expect_error(weasel_summarize_subset(p2, "lenient"), "keep_data")
+
+  sub <- weasel_apply(p2, "lenient", data = d)
+  expect_gt(nrow(sub), 0)
+  s <- weasel_summarize_subset(p2, "lenient", data = d)
+  expect_equal(s$headline$n_ids,
+               p2$plan$n_ids[p2$plan$scenario == "lenient_info_max"])
+
+  out2 <- capture.output(print(p2))
+  expect_true(any(grepl("keep_data = FALSE", out2, fixed = TRUE)))
+})
+
+test_that("duplicated (id, wave) rows warn and are counted once", {
+  d <- make_fixture()
+  dd <- rbind(d, d[1:5, ])
+  expect_warning(weasel_plan(dd, "id", "time", span = "full"),
+                 class = "weasel_duplicates")
+  p_clean <- suppressWarnings(weasel_plan(dd, "id", "time", span = "full"))
+  p_ref <- weasel_plan(d, "id", "time", span = "full")
+  expect_equal(p_clean$plan$n_ids, p_ref$plan$n_ids)
+  expect_equal(p_clean$id_metrics, p_ref$id_metrics)
 })
 
 test_that("summarize_subset defaults to the data stored in the plan", {
@@ -124,8 +199,16 @@ test_that("worst_missing reflects observed missingness", {
   d <- make_fixture()
   p <- weasel_plan(d, "id", "time", span = "full")
   len <- p$plan[p$plan$scenario == "lenient_info_max", ]
-  # f1 (3 of 8 waves) is retained by lenient settings? n_missing = 5 > max_missing = 2,
-  # so the worst retained respondent has at most 2 missing waves
+  # the worst retained respondent has at most 2 missing waves
   expect_lte(len$worst_missing, 2)
   expect_gte(len$worst_missing, 0)
+})
+
+test_that("plan errors are classed conditions", {
+  expect_error(weasel_apply(list(), "x"), class = "weasel_error_plan")
+  d <- make_fixture()
+  p <- weasel_plan(d, "id", "time", span = "full")
+  expect_error(weasel_apply(p, "nonexistent"),
+               class = "weasel_error_scenario")
+  expect_error(weasel_plan(1:3, "id", "time"), class = "weasel_error")
 })

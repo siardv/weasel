@@ -48,18 +48,14 @@ weasel_justify_subset <- function(plan_obj,
                                   full_name = "Wave-based Extraction and Selection for Longitudinal Data",
                                   digits = 3) {
   style <- match.arg(style)
-
-  if (!is.list(plan_obj) || is.null(plan_obj$plan) ||
-      !inherits(plan_obj$plan, "data.frame")) {
-    .weasel_stop("plan_obj must be the output of weasel_plan().")
-  }
-  if (!("scenario" %in% names(plan_obj$plan))) {
-    .weasel_stop("plan_obj$plan must contain a 'scenario' column.")
-  }
+  .weasel_check_plan(plan_obj)
 
   scenario <- weasel_match_scenario(scenario, plan_obj$plan$scenario)
   row <- plan_obj$plan[plan_obj$plan$scenario == scenario, , drop = FALSE]
-  if (nrow(row) != 1) .weasel_stop("scenario not found or ambiguous.")
+  if (nrow(row) != 1) {
+    .weasel_stop("scenario not found or ambiguous.",
+                 class = "weasel_error_scenario")
+  }
 
   get1 <- function(x) if (length(x) == 0) NA else x[[1]]
 
@@ -79,6 +75,7 @@ weasel_justify_subset <- function(plan_obj,
     NA_character_
   }
   note <- if ("note" %in% names(row)) as.character(get1(row$note)) else NA_character_
+  grid <- .weasel_or(plan_obj$grid, "consecutive")
 
   fmt <- function(x) .weasel_format_num(x, digits)
 
@@ -87,7 +84,15 @@ weasel_justify_subset <- function(plan_obj,
   } else {
     "the selected wave window"
   }
-  L_txt <- if (!is.na(L)) sprintf("L = %s", L) else NULL
+  L_txt <- if (!is.na(L)) {
+    if (identical(grid, "observed")) {
+      sprintf("L = %s observed waves", L)
+    } else {
+      sprintf("L = %s", L)
+    }
+  } else {
+    NULL
+  }
 
   endpoint_txt <- if (isTRUE(require_endpoints)) {
     "required observed endpoints to ensure temporal anchoring"

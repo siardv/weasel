@@ -13,6 +13,7 @@ set_weasel_scope(
   upper = NULL,
   gap = NULL,
   n_gap = NULL,
+  grid = c("consecutive", "observed"),
   override = TRUE
 )
 }
@@ -28,8 +29,8 @@ integer-valued entries.}
 
 \item{size}{Optional integer vector of acceptable per-respondent
 observation counts; respondents with fewer than \code{min(size)}
-observed waves are dropped by \code{\link[=reshape_to_wide]{reshape_to_wide()}}. Defaults to
-\verb{min(3, span length)} through the span length.}
+observed waves are dropped by \code{\link[=weasel_reshape_to_wide]{weasel_reshape_to_wide()}}. Defaults
+to \verb{min(3, span length)} through the span length.}
 
 \item{lower}{Optional lower bound of the wave range.}
 
@@ -43,6 +44,14 @@ no constraint.}
 \item{n_gap}{Optional integer; maximum allowed number of interior
 gaps. \code{NULL} (default) applies no constraint.}
 
+\item{grid}{How the wave grid inside the span is defined.
+\code{"consecutive"} (default) treats every integer between \code{lower} and
+\code{upper} as a scheduled wave; \code{"observed"} uses only wave values
+that occur anywhere in the data, which is the right choice for
+biennial and other non-consecutive schedules. With
+\code{"consecutive"}, \code{\link[=evaluate_weasel_scope]{evaluate_weasel_scope()}} warns when the span
+contains waves that no respondent has.}
+
 \item{override}{If \code{TRUE}, overwrite any existing scope. If \code{FALSE}
 and a scope already exists, an error is raised.}
 }
@@ -52,7 +61,9 @@ The scope environment, invisibly.
 \description{
 Initialises the package-internal scope that holds data, column names,
 and wave-range parameters used by the downstream pipeline functions.
-The user's global environment is never modified.
+All arguments are validated immediately, so mistakes fail here rather
+than several steps later. The user's global environment is never
+modified.
 }
 \examples{
 d <- generate_weasel_dummy_data(n_ids = 50, n_times = 8, seed = 1)
@@ -62,6 +73,11 @@ set_weasel_scope(d, "id", "time", upper = 8)
 
 # only respondents whose interior gaps are at most 1 wave long
 set_weasel_scope(d, "id", "time", gap = 1)
+
+# biennial schedule: use the observed grid
+b <- generate_weasel_dummy_data(n_ids = 30, waves = seq(2008, 2018, 2),
+                                seed = 1)
+set_weasel_scope(b, "id", "time", grid = "observed")
 
 weasel_clear_scope()
 

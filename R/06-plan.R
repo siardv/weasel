@@ -2,23 +2,23 @@
 
 # ---- internal helpers -----------------------------------------------------
 
-# per-respondent presence metrics over the integer span lower:upper;
+# per-respondent presence metrics over the wave grid `span`;
 # ids keep their original type; gaps are interior gaps (runs of missing
-# waves strictly between a respondent's first and last observed wave)
+# grid waves strictly between a respondent's first and last observed wave)
 #' @noRd
-.weasel_id_metrics <- function(data, id_col, wave_col, lower, upper) {
-  span <- .weasel_seq_int(lower, upper)
-  L    <- length(span)
+.weasel_id_metrics <- function(data, id_col, wave_col, span) {
+  L <- length(span)
 
-  d <- data[!is.na(data[[id_col]]) & !is.na(data[[wave_col]]),
-            c(id_col, wave_col), drop = FALSE]
-  d <- d[d[[wave_col]] >= lower & d[[wave_col]] <= upper, , drop = FALSE]
-  d <- unique(d)
+  ok    <- !is.na(data[[id_col]]) & !is.na(data[[wave_col]])
+  ids0  <- data[[id_col]][ok]
+  w0    <- as.integer(round(data[[wave_col]][ok]))
+  in_sp <- w0 %in% span
+  ids_v <- ids0[in_sp]
+  w_v   <- w0[in_sp]
 
-  ids <- sort(unique(d[[id_col]]))
-  if (length(ids) == 0) {
+  if (length(ids_v) == 0) {
     out <- data.frame(
-      id           = ids,
+      id           = character(0),
       n_present    = integer(0),
       n_missing    = integer(0),
       prop_present = numeric(0),
@@ -32,23 +32,13 @@
     return(out)
   }
 
-  present <- matrix(FALSE, nrow = length(ids), ncol = L)
-  i <- match(d[[id_col]], ids)
-  j <- match(as.integer(d[[wave_col]]), span)
-  ok <- !is.na(i) & !is.na(j)
-  present[cbind(i[ok], j[ok])] <- TRUE
+  dd    <- .weasel_dedup_index(ids_v, w_v)
+  ids_v <- ids_v[dd$idx]
+  w_v   <- w_v[dd$idx]
 
-  gaps <- apply(present, 1, .weasel_interior_gaps)
+  pos <- match(w_v, span)
+  out <- .weasel_gap_metrics(ids_v, pos, L)
 
-  out <- data.frame(
-    id           = ids,
-    n_present    = vapply(gaps, function(g) g$n_present, integer(1)),
-    has_lower    = present[, 1],
-    has_upper    = present[, L],
-    n_gap        = vapply(gaps, function(g) g$n_gap, integer(1)),
-    max_gap      = vapply(gaps, function(g) g$max_gap, integer(1)),
-    stringsAsFactors = FALSE
-  )
   out$n_missing    <- L - out$n_present
   out$prop_present <- out$n_present / L
   out <- out[c("id", "n_present", "n_missing", "prop_present",
@@ -59,44 +49,43 @@
 }
 
 # choose the analysis window; "core" slides a window of min_len
-# consecutive integer waves over the full integer span and picks the one
-# with the highest mean per-wave respondent coverage (unobserved waves
-# inside the span count as zero coverage)
+# consecutive grid waves over the full grid and picks the one with the
+# highest mean per-wave respondent coverage (with grid = "consecutive",
+# unobserved waves inside the span count as zero coverage)
 #' @noRd
 .weasel_choose_span <- function(data, id_col, wave_col,
-                                span = c("core", "full"), min_len = 6L) {
-  span  <- match.arg(span)
+                                span = c("core", "full"), min_len = 6L,
+                                grid = c("consecutive", "observed")) {
+  span <- match.arg(span)
+  grid <- match.arg(grid)
   waves <- .weasel_check_wave(data[[wave_col]], wave_col)
   if (length(waves) < 3) .weasel_stop("need at least 3 distinct waves.")
 
   lower_full <- min(waves)
   upper_full <- max(waves)
+  grid_full  <- .weasel_grid_waves(waves, lower_full, upper_full, grid)
+
   if (span == "full") {
-    return(list(lower = lower_full, upper = upper_full, reason = "full"))
+    if (grid == "consecutive") .weasel_warn_empty_span(grid_full, waves)
+    return(list(lower = lower_full, upper = upper_full,
+                span = grid_full, reason = "full"))
   }
 
-  span_full <- .weasel_seq_int(lower_full, upper_full)
-  W <- length(span_full)
+  W <- length(grid_full)
   L <- min(max(as.integer(min_len), 2L), W)
 
-  d <- unique(data[!is.na(data[[id_col]]) & !is.na(data[[wave_col]]),
-                   c(id_col, wave_col), drop = FALSE])
-  cov <- as.integer(table(factor(as.integer(d[[wave_col]]),
-                                 levels = span_full)))
+  ok   <- !is.na(data[[id_col]]) & !is.na(data[[wave_col]])
+  ids0 <- data[[id_col]][ok]
+  w0   <- as.integer(round(data[[wave_col]][ok]))
+  dd   <- .weasel_dedup_index(ids0, w0)
+  cov  <- tabulate(match(w0[dd$idx], grid_full), nbins = W)
+  cs   <- c(0L, cumsum(cov))
+  win <- cs[(L + 1L):(W + 1L)] - cs[seq_len(W - L + 1L)]
+  best_i <- which.max(win)
 
-  best_i <- 1L
-  best_score <- -Inf
-  for (i in seq_len(W - L + 1L)) {
-    s <- mean(cov[i:(i + L - 1L)])
-    if (s > best_score) {
-      best_score <- s
-      best_i <- i
-    }
-  }
-
-  list(lower = span_full[best_i],
-       upper = span_full[best_i + L - 1L],
-       reason = "core")
+  chosen <- grid_full[best_i:(best_i + L - 1L)]
+  if (grid == "consecutive") .weasel_warn_empty_span(chosen, waves)
+  list(lower = chosen[1L], upper = chosen[L], span = chosen, reason = "core")
 }
 
 # ---- exported planning functions ------------------------------------------
@@ -130,7 +119,8 @@ weasel_match_scenario <- function(scenario, choices) {
   if (length(hits) == 1) return(hits)
   .weasel_stop(
     "scenario not found or ambiguous: '", scenario,
-    "'. Available: ", paste(choices, collapse = ", ")
+    "'. Available: ", paste(choices, collapse = ", "),
+    class = "weasel_error_scenario"
   )
 }
 
@@ -156,7 +146,7 @@ weasel_match_scenario <- function(scenario, choices) {
 #'   as returned by [weasel_plan()].
 #' @param weights Named numeric vector overriding any of the default
 #'   weights `c(coverage = 2, endpoints = 1.2, size = 0.8,
-#'   missing = 0.6, gaps = 0.4)`.
+#'   missing = 0.6, gaps = 0.4)`. `NA` values are rejected.
 #'
 #' @return The plan data frame with added `score` and `recommended`
 #'   columns.
@@ -179,11 +169,14 @@ weasel_compare_scenarios <- function(plan_obj, weights = NULL) {
   w <- c(coverage = 2, endpoints = 1.2, size = 0.8,
          missing = 0.6, gaps = 0.4)
   if (!is.null(weights)) {
-    if (is.null(names(weights)) || !all(names(weights) %in% names(w))) {
+    wn <- names(weights)
+    if (is.null(wn) || !all(wn %in% names(w))) {
       .weasel_stop("weights must be a named vector using names: ",
                    paste(names(w), collapse = ", "))
     }
-    w[names(weights)] <- as.numeric(weights)
+    weights <- suppressWarnings(as.numeric(weights))
+    if (anyNA(weights)) .weasel_stop("weights must not contain NA.")
+    w[wn] <- weights
   }
 
   num_cols <- c("mean_prop_present", "endpoint_rate", "worst_missing",
@@ -259,31 +252,50 @@ weasel_compare_to_sentence <- function(cmp, digits = 3) {
 #' `anchored_balanced`, `lenient_info_max`) or a validated custom
 #' scenario table against the data, computing per-scenario respondent
 #' counts and observed quality metrics. Gap constraints refer to
-#' interior gaps: runs of missing waves strictly between a respondent's
-#' first and last observed wave inside the span; missing endpoints are
-#' handled separately through `require_endpoints`.
+#' interior gaps: runs of missing grid waves strictly between a
+#' respondent's first and last observed wave inside the span; missing
+#' endpoints are handled separately through `require_endpoints`.
 #'
 #' @param data A long-format data frame. A respondent is considered
 #'   observed at a wave if a row with that (id, wave) pair exists.
+#'   Duplicated (id, wave) rows are counted once and trigger a warning.
 #' @param id Name of the respondent-identifier column. Any atomic type
 #'   is supported.
 #' @param wave Name of the wave/time column. Must be numeric with
 #'   integer-valued entries.
 #' @param span Either `"core"` (highest-coverage window of `core_len`
-#'   consecutive waves) or `"full"` (all waves).
+#'   consecutive grid waves) or `"full"` (all waves).
 #' @param core_len Integer; desired window length when `span = "core"`.
 #' @param scenarios Optional data frame of custom scenarios with the
 #'   columns `scenario`, `require_endpoints`, `max_missing`,
 #'   `n_gap_max`, `max_gap_max`. The table is validated; missing
 #'   columns raise an error.
+#' @param grid How the wave grid inside the span is defined.
+#'   `"consecutive"` (default) treats every integer between the span
+#'   bounds as a scheduled wave; `"observed"` uses only wave values
+#'   that occur anywhere in the data, which is the right choice for
+#'   biennial and other non-consecutive schedules. With
+#'   `"consecutive"`, a warning (class `weasel_empty_waves`) is issued
+#'   when the chosen span contains waves that no respondent has, since
+#'   such waves count as missed by everyone.
+#' @param keep_data If `TRUE` (default), the original data is attached
+#'   to the returned object so that [weasel_apply()],
+#'   [weasel_summarize_subset()], and [weasel_selectivity()] can reuse
+#'   it. Set to `FALSE` to keep the plan object small (for example
+#'   before saving it with `saveRDS()`); those functions then need the
+#'   data passed back in through their `data` argument.
 #'
-#' @return A list with elements `plan` (scored scenario table),
-#'   `id_metrics`, `lower`, `upper`, `span_reason`, `id`, and `wave`.
-#'   The original `data` is attached as an attribute.
+#' @return A list of class `weasel_plan` with elements `plan` (scored
+#'   scenario table), `id_metrics`, `lower`, `upper`, `span` (integer
+#'   vector of grid waves), `grid`, `span_reason`, `id`, and `wave`.
+#'   When `keep_data = TRUE` the original `data` is attached as an
+#'   attribute. Printing the object shows a compact summary instead of
+#'   the raw list.
 #'
 #' @examples
 #' d <- generate_weasel_dummy_data(n_ids = 100, n_times = 10, seed = 1)
 #' p <- weasel_plan(d, id = "id", wave = "time", span = "core")
+#' p
 #'
 #' cmp <- weasel_compare_scenarios(p)
 #' weasel_print_table(cmp, title = "Scenario overview")
@@ -291,25 +303,39 @@ weasel_compare_to_sentence <- function(cmp, digits = 3) {
 #' sub <- weasel_apply(p, "anchored_balanced")
 #' dim(sub)
 #'
+#' # biennial schedule: evaluate presence on the observed grid
+#' b <- generate_weasel_dummy_data(n_ids = 60, waves = seq(2008, 2020, 2),
+#'                                 seed = 1)
+#' pb <- weasel_plan(b, "id", "time", span = "full", grid = "observed")
+#'
 #' @export
 weasel_plan <- function(data,
                         id,
                         wave,
                         span = c("core", "full"),
                         core_len = 6L,
-                        scenarios = NULL) {
+                        scenarios = NULL,
+                        grid = c("consecutive", "observed"),
+                        keep_data = TRUE) {
   .weasel_check_id_wave(data, id, wave)
   span <- match.arg(span)
+  grid <- match.arg(grid)
+  .weasel_check_duplicates(
+    data[!is.na(data[[id]]) & !is.na(data[[wave]]), c(id, wave), drop = FALSE],
+    id, wave
+  )
 
   span_pick <- .weasel_choose_span(data, id, wave,
                                    span = span,
-                                   min_len = as.integer(core_len))
+                                   min_len = as.integer(core_len),
+                                   grid = grid)
   lower       <- span_pick$lower
   upper       <- span_pick$upper
+  span_vec    <- span_pick$span
   span_reason <- span_pick$reason
-  L           <- length(.weasel_seq_int(lower, upper))
+  L           <- length(span_vec)
 
-  idm <- .weasel_id_metrics(data, id, wave, lower, upper)
+  idm <- .weasel_id_metrics(data, id, wave, span_vec)
   if (nrow(idm) == 0) .weasel_stop("no usable ids found in the chosen span.")
 
   if (is.null(scenarios)) {
@@ -325,41 +351,32 @@ weasel_plan <- function(data,
   }
   scenarios <- .weasel_check_scenarios(scenarios)
 
-  build_ids <- function(require_endpoints, max_missing, n_gap_max,
-                        max_gap_max) {
-    keep <- idm$n_missing <= max_missing &
-      idm$n_gap <= n_gap_max &
-      idm$max_gap <= max_gap_max
-    if (isTRUE(require_endpoints)) {
+  keep_masks <- lapply(seq_len(nrow(scenarios)), function(i) {
+    keep <- idm$n_missing <= scenarios$max_missing[i] &
+      idm$n_gap <= scenarios$n_gap_max[i] &
+      idm$max_gap <= scenarios$max_gap_max[i]
+    if (isTRUE(scenarios$require_endpoints[i])) {
       keep <- keep & idm$has_lower & idm$has_upper
     }
-    idm[[id]][keep]
-  }
-
-  ids_list <- lapply(seq_len(nrow(scenarios)), function(i) {
-    build_ids(
-      scenarios$require_endpoints[i],
-      scenarios$max_missing[i],
-      scenarios$n_gap_max[i],
-      scenarios$max_gap_max[i]
-    )
+    keep
   })
+  ids_list <- lapply(keep_masks, function(k) idm[[id]][k])
 
   plan       <- scenarios
   plan$ids   <- ids_list
-  plan$n_ids <- vapply(ids_list, length, integer(1))
+  plan$n_ids <- vapply(keep_masks, sum, integer(1))
 
   stat_for <- function(col, fun = mean) {
-    vapply(ids_list, function(ids) {
-      v <- idm[[col]][idm[[id]] %in% ids]
+    vapply(keep_masks, function(k) {
+      v <- idm[[col]][k]
       if (length(v) == 0) NA_real_ else as.numeric(fun(v))
     }, numeric(1))
   }
 
   plan$mean_present      <- stat_for("n_present")
   plan$mean_prop_present <- stat_for("prop_present")
-  plan$endpoint_rate     <- vapply(ids_list, function(ids) {
-    v <- (idm$has_lower & idm$has_upper)[idm[[id]] %in% ids]
+  plan$endpoint_rate     <- vapply(keep_masks, function(k) {
+    v <- (idm$has_lower & idm$has_upper)[k]
     if (length(v) == 0) NA_real_ else mean(v)
   }, numeric(1))
   plan$mean_n_gap    <- stat_for("n_gap")
@@ -381,20 +398,75 @@ weasel_plan <- function(data,
 
   plan <- weasel_compare_scenarios(list(plan = plan))
 
+  grid_txt <- if (grid == "observed") {
+    paste0(L, " observed waves")
+  } else {
+    paste0("L = ", L)
+  }
   .weasel_ok("plan ready: span ", lower, ":", upper,
-             " (", span_reason, ", L = ", L, ")")
+             " (", span_reason, ", ", grid_txt, ")")
 
   obj <- list(
     plan        = plan,
     id_metrics  = idm,
     lower       = lower,
     upper       = upper,
+    span        = span_vec,
+    grid        = grid,
     span_reason = span_reason,
     id          = id,
     wave        = wave
   )
-  attr(obj, "data") <- data
+  if (isTRUE(keep_data)) attr(obj, "data") <- data
+  class(obj) <- "weasel_plan"
   obj
+}
+
+#' Print a weasel plan
+#'
+#' Compact display of a plan object: the chosen span, the number of
+#' respondents observed in it, and the scored scenario table. The
+#' attached data (if any) and the per-scenario id lists are summarised
+#' by size instead of being printed in full.
+#'
+#' @param x Object returned by [weasel_plan()].
+#' @param digits Integer; decimal places for numeric columns.
+#' @param ... Ignored.
+#'
+#' @return `x`, invisibly.
+#'
+#' @examples
+#' d <- generate_weasel_dummy_data(n_ids = 60, n_times = 8, seed = 1)
+#' p <- weasel_plan(d, "id", "time", span = "core")
+#' p
+#'
+#' @export
+print.weasel_plan <- function(x, digits = 3, ...) {
+  sp <- .weasel_or(x$span, .weasel_seq_int(x$lower, x$upper))
+  grid_txt <- if (identical(x$grid, "observed")) {
+    paste0(length(sp), " observed waves")
+  } else {
+    paste0("L = ", length(sp))
+  }
+  cat("<weasel_plan>\n")
+  cat("  span: ", x$lower, ":", x$upper, " (",
+      .weasel_or(x$span_reason, "?"), ", ", grid_txt, ")\n", sep = "")
+  cat("  respondents observed in span: ", nrow(x$id_metrics), "\n", sep = "")
+
+  cols <- intersect(c("scenario", "n_ids", "mean_prop_present",
+                      "endpoint_rate", "score", "recommended"),
+                    names(x$plan))
+  tab <- x$plan[cols]
+  for (nm in names(tab)) tab[[nm]] <- .weasel_maybe_round(tab[[nm]], digits)
+  print(tab, row.names = FALSE)
+
+  d <- attr(x, "data")
+  if (is.null(d)) {
+    cat("  data: not attached (created with keep_data = FALSE)\n")
+  } else {
+    cat("  data: ", nrow(d), " row(s) attached\n", sep = "")
+  }
+  invisible(x)
 }
 
 #' Apply a scenario to obtain filtered long-format data
@@ -406,6 +478,9 @@ weasel_plan <- function(data,
 #'
 #' @param plan_obj Object returned by [weasel_plan()].
 #' @param scenario Name (or unambiguous abbreviation) of the scenario.
+#' @param data Optional long-format data frame; defaults to the data
+#'   attached to `plan_obj`. Required when the plan was created with
+#'   `keep_data = FALSE`.
 #'
 #' @return A data frame.
 #'
@@ -420,30 +495,35 @@ weasel_plan <- function(data,
 #' strict <- weasel_apply(p, "strict")
 #' dim(strict)
 #'
+#' # plans built with keep_data = FALSE need the data passed back in
+#' p2 <- weasel_plan(d, "id", "time", span = "core", keep_data = FALSE)
+#' nrow(weasel_apply(p2, "lenient", data = d))
+#'
 #' @export
-weasel_apply <- function(plan_obj, scenario) {
-  if (!is.list(plan_obj) || is.null(plan_obj$plan)) {
-    .weasel_stop("plan_obj must be from weasel_plan().")
-  }
+weasel_apply <- function(plan_obj, scenario, data = NULL) {
+  .weasel_check_plan(plan_obj)
   scenario <- weasel_match_scenario(scenario, plan_obj$plan$scenario)
   row <- plan_obj$plan[plan_obj$plan$scenario == scenario, , drop = FALSE]
-  if (nrow(row) != 1) .weasel_stop("scenario not found or ambiguous.")
-
-  data <- attr(plan_obj, "data")
-  if (is.null(data)) {
-    .weasel_stop("plan_obj has no attached data; recreate with weasel_plan().")
+  if (nrow(row) != 1) {
+    .weasel_stop("scenario not found or ambiguous.",
+                 class = "weasel_error_scenario")
   }
 
-  ids_keep <- row$ids[[1]]
+  if (is.null(data)) data <- attr(plan_obj, "data")
+  if (is.null(data)) {
+    .weasel_stop("no data available: the plan was created with ",
+                 "keep_data = FALSE; pass the original data via the ",
+                 "'data' argument.")
+  }
   id_col   <- plan_obj$id
   wave_col <- plan_obj$wave
-  lower    <- as.integer(row$lower[[1]])
-  upper    <- as.integer(row$upper[[1]])
+  .weasel_check_id_wave(data, id_col, wave_col)
 
-  data[data[[id_col]] %in% ids_keep &
-         !is.na(data[[wave_col]]) &
-         data[[wave_col]] >= lower &
-         data[[wave_col]] <= upper, , drop = FALSE]
+  ids_keep <- row$ids[[1]]
+  sp    <- .weasel_plan_span(plan_obj, row)
+  w_int <- as.integer(round(data[[wave_col]]))
+
+  data[data[[id_col]] %in% ids_keep & (w_int %in% sp), , drop = FALSE]
 }
 
 #' Summarize a chosen scenario subset
@@ -457,7 +537,8 @@ weasel_apply <- function(plan_obj, scenario) {
 #' @param plan_obj Object returned by [weasel_plan()].
 #' @param scenario Name of the scenario to summarize.
 #' @param data Optional long-format data frame; defaults to the data
-#'   attached to `plan_obj`.
+#'   attached to `plan_obj`. Required when the plan was created with
+#'   `keep_data = FALSE`.
 #' @param id Optional id column name; defaults to `plan_obj$id`.
 #' @param wave Optional wave column name; defaults to `plan_obj$wave`.
 #' @param digits Number of decimal places for the sentence output.
@@ -477,42 +558,44 @@ weasel_apply <- function(plan_obj, scenario) {
 #' @export
 weasel_summarize_subset <- function(plan_obj, scenario, data = NULL,
                                     id = NULL, wave = NULL, digits = 3) {
-  if (!is.list(plan_obj) || is.null(plan_obj$plan)) {
-    .weasel_stop("plan_obj must be from weasel_plan().")
-  }
-  if (!is.data.frame(plan_obj$plan)) {
-    .weasel_stop("plan_obj$plan must be a data.frame.")
-  }
+  .weasel_check_plan(plan_obj)
 
   if (is.null(data)) data <- attr(plan_obj, "data")
+  if (is.null(data)) {
+    .weasel_stop("no data available: the plan was created with ",
+                 "keep_data = FALSE; pass the original data via the ",
+                 "'data' argument.")
+  }
   if (is.null(id))   id   <- plan_obj$id
   if (is.null(wave)) wave <- plan_obj$wave
   .weasel_check_id_wave(data, id, wave)
 
   scenario <- weasel_match_scenario(scenario, plan_obj$plan$scenario)
   row <- plan_obj$plan[plan_obj$plan$scenario == scenario, , drop = FALSE]
-  if (nrow(row) != 1) .weasel_stop("scenario not found or ambiguous.")
+  if (nrow(row) != 1) {
+    .weasel_stop("scenario not found or ambiguous.",
+                 class = "weasel_error_scenario")
+  }
 
   ids_keep <- row$ids[[1]]
   lower    <- as.integer(row$lower[[1]])
   upper    <- as.integer(row$upper[[1]])
-  L        <- as.integer(row$L[[1]])
+  sp       <- .weasel_plan_span(plan_obj, row)
+  L        <- length(sp)
   if (length(ids_keep) == 0) {
     .weasel_stop("scenario '", scenario, "' retains no respondents.")
   }
 
-  subdat <- data[data[[id]] %in% ids_keep &
-                   !is.na(data[[wave]]) &
-                   data[[wave]] >= lower &
-                   data[[wave]] <= upper, , drop = FALSE]
+  w_all  <- as.integer(round(data[[wave]]))
+  subdat <- data[data[[id]] %in% ids_keep & (w_all %in% sp), , drop = FALSE]
 
-  id_wave <- unique(subdat[, c(id, wave), drop = FALSE])
-  span    <- .weasel_seq_int(lower, upper)
+  id_wave <- subdat[c(id, wave)]
+  id_wave[[wave]] <- as.integer(round(id_wave[[wave]]))
+  id_wave <- unique(id_wave)
 
   per_wave <- data.frame(
-    wave  = span,
-    n_ids = as.integer(table(factor(as.integer(id_wave[[wave]]),
-                                    levels = span))),
+    wave  = sp,
+    n_ids = as.integer(table(factor(id_wave[[wave]], levels = sp))),
     stringsAsFactors = FALSE
   )
 
@@ -553,11 +636,17 @@ weasel_summarize_subset <- function(plan_obj, scenario, data = NULL,
     collapse = "; "
   )
 
+  L_txt <- if (identical(plan_obj$grid, "observed")) {
+    paste0("L = ", L, " observed waves")
+  } else {
+    paste0("L = ", L)
+  }
+
   sentence <- paste0(
     "Scenario ", dQuote(scenario, FALSE), " selects ", headline$n_ids,
     " respondent(s) and yields ", headline$n_rows,
     " row(s) in long format for waves ", lower, " to ", upper,
-    " (L = ", L, "). ",
+    " (", L_txt, "). ",
     "Mean observed waves: ",
     .weasel_format_num(headline$mean_present, digits),
     " (missing: ", .weasel_format_num(headline$mean_missing, digits), "). ",

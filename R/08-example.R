@@ -1,12 +1,13 @@
 #' Run a full weasel demonstration
 #'
 #' Exercises both the scope-based pipeline and the planning interface on
-#' synthetic dummy data, then cleans up the scope.
+#' synthetic dummy data, including the sensitivity diagnostic, then
+#' cleans up the scope.
 #'
 #' @param seed Random seed passed to [generate_weasel_dummy_data()].
 #'
-#' @return A list with elements `data`, `plan`, `compare`, and
-#'   `summary`, invisibly.
+#' @return A list with elements `data`, `plan`, `compare`, `summary`,
+#'   and `sensitivity`, invisibly.
 #'
 #' @examples
 #' \dontrun{
@@ -21,13 +22,14 @@ weasel_example <- function(seed = 42) {
 
   set_weasel_scope(long_data, id = "id", wave = "time", gap = 2)
   evaluate_weasel_scope()
-  reshape_to_wide()
-  summarize_waves()
+  weasel_reshape_to_wide()
+  weasel_summarize_waves()
+  weasel_scope_info()
 
-  weasel_print_table(filter_wave_summary(),
+  weasel_print_table(weasel_filter_wave_summary(),
                      title = "Wave pattern summary (top 10)", n = 10)
 
-  subset_from_row1 <- get_data_by_row(1)
+  subset_from_row1 <- weasel_get_data_by_row(1)
   weasel_print_table(utils::head(subset_from_row1, 10),
                      title = "Subset from row 1 (preview)", n = 10)
 
@@ -41,10 +43,13 @@ weasel_example <- function(seed = 42) {
   weasel_print_table(s$headline, title = "Chosen subset headline", digits = 3)
   .weasel_msg(weasel_subset_to_sentence(s))
 
+  sens <- weasel_sensitivity(plan_obj, max_missing = 0:2)
+  weasel_print_table(sens, title = "Tolerance sensitivity (top rows)", n = 6)
+
   .weasel_h2("Justification paragraph (methods style)")
   just <- weasel_justify_subset(plan_obj, "anchored_balanced")
   .weasel_msg(just)
 
   invisible(list(data = long_data, plan = plan_obj,
-                 compare = cmp, summary = s))
+                 compare = cmp, summary = s, sensitivity = sens))
 }
