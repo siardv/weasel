@@ -83,10 +83,10 @@ strictly between a respondent's first and last observed wave).
 
 ## A note on how this package was built
 
-I started building weasel in 2020, before AI coding assistants were a
+I started building `weasel` in June 2021, before AI coding assistants were a
 realistic option, and it has been a constant companion project ever
 since. The problem it addresses, the selection logic, the architecture,
-and the design decisions grew out of six years of building, discarding,
+and the design decisions grew out of five years of building, discarding,
 and rebuilding.
 
 I also want to be open about the fact that AI language models
@@ -99,7 +99,7 @@ rewritten; whatever ships has passed the full test suite and R CMD
 check, and responsibility for every line, including the mistakes, is
 mine alone.
 
-weasel exists to make selection decisions in panel data explicit
+`weasel` exists to make selection decisions in panel data explicit
 instead of silent. It seems only consistent to be equally explicit
 about how the package itself was made. If you have questions about any
 part of that process, the issue tracker is open.
