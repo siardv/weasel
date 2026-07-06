@@ -10,8 +10,13 @@
 #'
 #' The returned grid is therefore deliberately incomplete; this is what
 #' both weasel pipelines analyse. The function has no net effect on the
-#' caller's RNG state: the state present before the call is restored on
-#' exit, and reproducibility is controlled through `seed`.
+#' caller's RNG state: the state present before the call (including the
+#' `RNGkind()` setting) is restored on exit, and reproducibility is
+#' controlled through `seed`. Internally the generator pins the RNG
+#' configuration to `RNGkind("Mersenne-Twister", "Inversion",
+#' sample.kind = "Rejection")`, the R >= 3.6 defaults, so a given seed
+#' reproduces the same panel even when the caller uses a non-default
+#' sampler (for example `sample.kind = "Rounding"`).
 #'
 #' @param n_ids Number of respondents.
 #' @param n_times Number of time points (waves). Ignored when `waves`
@@ -41,7 +46,8 @@
 #'   these labels. Analyse such data with `grid = "observed"` in
 #'   [weasel_plan()] or [set_weasel_scope()].
 #' @param seed Random seed. If `NULL`, a seed is drawn and reported so
-#'   the data set can be regenerated.
+#'   the data set can be regenerated. A given seed reproduces the same
+#'   panel regardless of the caller's `RNGkind()`; see Details.
 #'
 #' @return A data frame in long format with columns `id`, `time`, and
 #'   `var1` ... `varN`. Respondents keep at least one observed wave, so
@@ -97,6 +103,10 @@ generate_weasel_dummy_data <- function(n_ids = 1000,
   }
 
   .weasel_with_preserved_seed({
+    # pin the sampler so a given seed reproduces the same panel under any
+    # caller RNGkind(); the caller's state and kind are restored on exit
+    RNGkind(kind = "Mersenne-Twister", normal.kind = "Inversion",
+            sample.kind = "Rejection")
     if (is.null(seed)) seed <- sample.int(1e6, 1)
     set.seed(seed)
     .weasel_msg("seed: ", seed)

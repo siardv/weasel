@@ -63,7 +63,8 @@ these labels. Analyse such data with \code{grid = "observed"} in
 \code{\link[=weasel_plan]{weasel_plan()}} or \code{\link[=set_weasel_scope]{set_weasel_scope()}}.}
 
 \item{seed}{Random seed. If \code{NULL}, a seed is drawn and reported so
-the data set can be regenerated.}
+the data set can be regenerated. A given seed reproduces the same
+panel regardless of the caller's \code{RNGkind()}; see Details.}
 }
 \value{
 A data frame in long format with columns \code{id}, \code{time}, and
@@ -83,8 +84,12 @@ can be added on top.
 \details{
 The returned grid is therefore deliberately incomplete; this is what
 both weasel pipelines analyse. The function has no net effect on the
-caller's RNG state: the state present before the call is restored on
-exit, and reproducibility is controlled through \code{seed}.
+caller's RNG state: the state present before the call (including the
+\code{RNGkind()} setting) is restored on exit, and reproducibility is
+controlled through \code{seed}. Internally the generator pins the RNG
+configuration to \code{RNGkind("Mersenne-Twister", "Inversion", sample.kind = "Rejection")}, the R >= 3.6 defaults, so a given seed
+reproduces the same panel even when the caller uses a non-default
+sampler (for example \code{sample.kind = "Rounding"}).
 }
 \examples{
 d <- generate_weasel_dummy_data(n_ids = 50, n_times = 8, seed = 1)
