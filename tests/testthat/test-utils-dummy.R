@@ -89,6 +89,22 @@ test_that("dummy data is reproducible and RNG-neutral", {
   expect_identical(x1, x2)
 })
 
+test_that("dummy data is invariant to the caller's RNG kind", {
+  d_default <- generate_weasel_dummy_data(n_ids = 20, n_times = 6, seed = 42)
+
+  old <- RNGkind()
+  on.exit(suppressWarnings(RNGkind(old[1], old[2], old[3])), add = TRUE)
+  suppressWarnings(
+    RNGkind("Wichmann-Hill", "Box-Muller", sample.kind = "Rounding")
+  )
+  d_legacy <- generate_weasel_dummy_data(n_ids = 20, n_times = 6, seed = 42)
+
+  # same seed, same panel, regardless of the caller's sampler
+  expect_identical(d_default, d_legacy)
+  # and the caller's non-default kind survives the call untouched
+  expect_identical(RNGkind(), c("Wichmann-Hill", "Box-Muller", "Rounding"))
+})
+
 test_that("dummy data supports explicit wave schedules", {
   sched <- seq(2008L, 2020L, by = 2L)
   b <- generate_weasel_dummy_data(n_ids = 25, waves = sched, seed = 3)

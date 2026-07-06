@@ -1,0 +1,35 @@
+# fails when the displayed site version or the NEWS.md heading drifts
+# from DESCRIPTION, keeping DESCRIPTION the single source of truth
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+name: version-coherence
+
+permissions: read-all
+
+jobs:
+  version-coherence:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: check site and NEWS against DESCRIPTION
+        shell: bash
+        run: |
+          ver="$(sed -n 's/^Version:[[:space:]]*//p' DESCRIPTION | tr -d '[:space:]')"
+          if [ -z "$ver" ]; then
+            echo "::error::could not read Version from DESCRIPTION"
+            exit 1
+          fi
+          echo "DESCRIPTION version: $ver"
+          if ! grep -Fq ">v${ver}<" docs/index.html; then
+            echo "::error::docs/index.html does not display v${ver}"
+            exit 1
+          fi
+          if ! grep -q "^# weasel ${ver}\b" NEWS.md; then
+            echo "::error::NEWS.md has no '# weasel ${ver}' heading"
+            exit 1
+          fi

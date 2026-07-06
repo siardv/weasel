@@ -6,5 +6,4 @@ doc/
 Meta/
 *.Rcheck/
 weasel_*.tar.gz
-/NEWS.md
 publish-weasel.sh
