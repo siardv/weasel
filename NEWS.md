@@ -1,201 +1,130 @@
-# weasel (development version)
+# weasel 0.4.0
 
-Stage 1 of the 0.4.0 cycle: release safety and documentation accuracy.
-No changes to computational behaviour.
+A consolidation release: corrections, honesty on imperfect input, one
+constraint vocabulary, and transparency for every automatic decision.
+No new modelling features. Results on clean panels with default
+arguments are unchanged except where noted below; every behavioural
+change is guarded by the expanded test suite (240 to 480 assertions).
 
-* Guide (documentation site): corrected two descriptions that
-  contradicted the implementation. The `gap`/`n_gap` scope constraints
-  were described as inert; they filter respondents at
-  `weasel_reshape_to_wide()` (and are covered by tests). The
-  synthetic-data walkthroughs described a pre-0.3 complete-grid,
-  item-NA data model and presented a "focal outcome" filtering step as
-  required; `generate_weasel_dummy_data()` produces row-absence
-  missingness directly, so that step is now described only as an
-  optional way to key observation to outcome availability. Also fixed:
-  the pattern-table `n` column description (observed waves per pattern,
-  not window length), the missing `sensitivity` element in the
-  `weasel_example()` return listing, and the footer installation
-  command (the package installs from GitHub, not CRAN). All guide
-  code snippets now start with `library(weasel)`, so each one runs
-  as pasted in a fresh session.
-* `.Rbuildignore` and `.gitignore` now exclude the local `v3/` staging
-  folder and `update_github_repo.sh`, so tarballs built from a local
-  working copy match CI builds, no development artifacts ship, and an
-  accidental `git add -A` cannot publish internal drafts.
-* Added `inst/CITATION` so `citation("weasel")` agrees with
-  `CITATION.cff`; the version is read from `DESCRIPTION` at build time.
-* The version-coherence workflow now also checks the `CITATION.cff`
-  version against `DESCRIPTION`.
+## Breaking and behaviour changes
 
-Stage 2 of the 0.4.0 cycle: test scaffolding and CI hardening.
-Additive, plus one bug the new scaffolding exposed immediately.
-
-* Fixed: the backwards-compatibility fallback for plan objects saved
-  by pre-0.3 versions (which stored only the span bounds, not `$span`)
-  had never worked. `$` partial matching picked up `span_reason`
-  instead, its `"full"`/`"core"` label coerced to `NA`, and every wave
-  failed the span filter, so `weasel_apply()`,
-  `weasel_summarize_subset()`, and `weasel_selectivity()` silently
-  returned zero rows for such objects. Exact `[["span"]]` indexing in
-  `.weasel_plan_span()` and `print.weasel_plan()` fixes this; a
-  regression test now exercises the legacy path end to end.
-
-* New test suites lock the package's central methodological claims in
-  place before any further changes: cross-pipeline equivalence (the
-  scope constraints and an equivalent plan scenario must retain
-  identical respondents, on consecutive and observed grids, with
-  identical per-respondent metrics), algebraic invariants on the id
-  metrics and pattern tables, exact agreement between
-  `weasel_sensitivity()` and brute-force filtering, row-order
-  invariance of plans, duplicate-row neutrality in both pipelines, and
-  serialization round trips (including `keep_data = FALSE` reunion and
-  the pre-0.3 legacy fallback for plans without a stored `$span`).
-* New `guide-snippets` GitHub Actions workflow: every R code snippet
-  embedded in the guide is extracted and executed against the
-  installed package on each push, so guide examples can no longer
-  drift from the implementation without failing CI.
-
-Stage 3 of the 0.4.0 cycle: dirty-input and degenerate-case
-correctness. Behaviour changes affect malformed input and degenerate
-cases only; results on clean panels are unchanged (and guarded by the
-stage 2 invariant and equivalence suites).
-
-* `weasel_compare_to_sentence()` no longer fabricates a
-  recommendation when no scenario is recommendable (previously it fell
-  back to the first row and reported it as recommended); it now states
-  plainly that no scenario is recommended.
-* `weasel_selectivity()` now deduplicates (id, wave) pairs: covariate
-  values are averaged within each duplicated pair, a classed warning
-  (`weasel_duplicates`) is emitted, and the diagnostic no longer
-  depends on the row order of the input. Previously, with duplicated
-  rows, `at = "first"` silently used whichever duplicate appeared
-  first and `at = "mean"` double-counted duplicated waves.
-* `weasel_apply()` and `weasel_summarize_subset()` emit a classed
-  warning (`weasel_duplicates`) when the returned data still contain
-  duplicated (id, wave) rows, and their documentation now spells out
-  the contract: selection metrics count each pair once, output rows
-  are returned as-is (participation deduplication is not output-row
-  deduplication).
-* `id` and `wave` must now name different columns; previously
-  `weasel_plan(d, "time", "time")` was accepted and silently retained
-  nobody.
-* Rows excluded from participation analysis (missing id, missing
-  wave, outside the span) are now counted in a verbose-mode message in
-  both pipelines instead of disappearing silently.
-* `weasel_justify_subset()` refuses to write a justification for a
-  scenario that retains no respondents (classed error
-  `weasel_error_empty_scenario`, also added to the corresponding
-  errors in `weasel_summarize_subset()`).
-* Scenario matching now accepts an exact name or an unambiguous
-  prefix; arbitrary substrings (for example `"strict"` for
-  `anchored_strict`, or `"ed_ba"`) no longer match.
-* Strict integer validation everywhere a whole number is expected:
-  `gap`, `n_gap`, `size`, `lower`, `upper`, `core_len`, sensitivity
-  tolerances, scenario-table tolerance columns (`Inf` still means "no
-  constraint"), `digits`/`n` in `weasel_print_table()`, and the
-  generator's count and `waves` arguments. Fractional values are
-  rejected with a clear error instead of being silently truncated
-  (previously `gap = 1.9` acted as `gap = 1`) or rounded (previously
-  `lower = 2.6` acted as `lower = 3`).
-
-Stage 4 of the 0.4.0 cycle: additive transparency and self-protection
-for plans. All changes are additive; results on clean panels with
-default arguments are unchanged.
-
-* `weasel_plan()` gains explicit `lower`/`upper` bounds: the window is
-  then fixed a priori (`span_reason = "explicit"`), and the generated
-  justification text reports it as a design decision instead of
-  attributing it to an automatic span rule. Supplying both `span` and
-  bounds is an error.
-* Core-window selection is now inspectable: every candidate window and
-  its coverage is stored in `plan$span_candidates`, the objective
-  (total deduplicated respondent-wave coverage, earliest window on
-  ties) is documented, and exact coverage ties trigger a classed
-  warning (`weasel_tied_windows`) instead of a silent `which.max()`.
-* `weasel_compare_scenarios()` gains `tie_tolerance` and a `near_tie`
-  column flagging scenarios the score cannot meaningfully separate;
-  the active weights and the per-scenario score decomposition are
-  attached as attributes (`"weights"`, `"score_components"`); the
-  documentation now states plainly that the score is a
-  comparison-relative heuristic (the size term is normalised within
-  the supplied scenario set) and that endpoint-requiring scenarios
-  earn the endpoint term by construction. The recommendation sentence
-  is now conditional ("highest composite score under the declared
-  weights") and notes when the recommendation is not unique.
-* Plans now record their planning population: rows and distinct ids in
-  the supplied data versus ids and unique pairs observed in the span.
-  The denominator (`observed_in_span`) is printed, documented, and
-  stated in the generated justification text, so retention figures can
-  no longer be mistaken for proportions of the full panel.
-* Plans now store a structural fingerprint of the data they were built
-  from; `weasel_apply()`, `weasel_summarize_subset()`, and
-  `weasel_selectivity()` compare explicitly supplied data against it
-  and emit a classed warning (`weasel_data_mismatch`) when the data do
-  not match, closing a silent-reunion hazard for plans saved with
-  `keep_data = FALSE`.
-* The wave-pattern summary gains a stable `pattern` id column that
-  survives filtering, and `weasel_get_data_by_row()` accepts pattern
-  ids or pattern strings. Previously the printed, filtered table gave
-  no way to see the original row numbers, so extraction after
-  filtering could silently target the wrong pattern.
-
-Stage 5 of the 0.4.0 cycle: one constraint vocabulary across both
-pipelines. Renames ship with deprecation paths; one default changes.
-
-* Harmonized constraint names: `min_present`, `max_missing`,
-  `n_gap_max`, `max_gap_len`, `require_endpoints`. In
-  `set_weasel_scope()`, `size` becomes `min_present` (a single
-  integer; the old vector form's minimum is used through the alias),
-  `gap` becomes `max_gap_len`, and `n_gap` becomes `n_gap_max`. The
-  deprecated aliases keep working through the 0.x series with classed
-  warnings (`weasel_deprecated`), and an explicitly supplied new-name
-  argument always wins over its alias.
-* The scope gains optional `max_missing` and `require_endpoints`
-  constraints, so the exploratory pipeline can preview exactly what a
-  plan scenario would retain; the cross-pipeline equivalence tests now
-  cover the anchored case too.
-* Scenario tables use `max_gap_len` in place of the double-superlative
-  `max_gap_max`. The old column name is accepted with a deprecation
-  warning, plans saved by older versions keep working (the
-  justification generator reads either column), and
+* One constraint vocabulary across both pipelines: `min_present`,
+  `max_missing`, `n_gap_max`, `max_gap_len`, `require_endpoints`. In
+  `set_weasel_scope()`, `size` (its minimum), `gap`, and `n_gap` are
+  deprecated aliases of `min_present`, `max_gap_len`, and `n_gap_max`;
+  scenario tables use `max_gap_len` in place of `max_gap_max`, and
   `weasel_sensitivity()` renames its argument and output column
-  accordingly, keeping `max_gap_max` as a deprecated argument alias.
+  accordingly. All old names keep working through the 0.x series with
+  classed warnings (`weasel_deprecated`); an explicit new-name argument
+  always wins over its alias, and plans saved by older versions remain
+  readable.
 * The scope's default minimum presence is now `min_present = 1`:
   exploration shows every respondent with at least one observed wave
   instead of silently dropping those with fewer than three. Set
-  `min_present = 3` to reproduce the previous default; the
-  drop-accounting message reports exclusions either way.
-* The `recommended` column keeps its name: with the declared-weights
-  wording, the `near_tie` flag, and the exposed score decomposition
-  from stage 4, its meaning is now explicit at the source, which is
-  where the ambiguity actually lived.
-* README, both vignettes, the guide, and the bundled example script
-  use the harmonized vocabulary throughout.
+  `min_present = 3` to reproduce the old default.
+* Scenario matching accepts an exact name or an unambiguous prefix;
+  arbitrary substrings (for example `"strict"` for `anchored_strict`)
+  no longer match.
+* Strict integer validation everywhere a whole number is expected
+  (`gap`/`max_gap_len`, `n_gap`/`n_gap_max`, `min_present`, `lower`,
+  `upper`, `core_len`, sensitivity tolerances, scenario columns with
+  `Inf` still meaning "no constraint", `digits`/`n` in
+  `weasel_print_table()`, generator counts and `waves`). Fractional
+  values are rejected instead of silently truncated (previously
+  `gap = 1.9` acted as `1`) or rounded (previously `lower = 2.6` acted
+  as `3`).
+* `id` and `wave` must name different columns; rows dropped from
+  participation analysis (missing id, missing wave, outside the span)
+  are counted in a verbose-mode message in both pipelines.
+* `weasel_justify_subset()` refuses scenarios that retain no
+  respondents, and `weasel_compare_to_sentence()` states plainly when
+  no scenario is recommendable instead of naming one (both classed;
+  `weasel_error_empty_scenario` where applicable).
 
-Stage 6 of the 0.4.0 cycle: documentation enrichment and snapshot
-tests. Documentation and tests only; no package code changed.
+## Fixes
 
-* Guide: the plan recipes now include the sensitivity and selectivity
-  diagnostics; the result notes explain `recommended`/`near_tie`
-  semantics, the candidate-window table, explicit a-priori bounds,
-  `keep_data` with the fingerprint guard, the planning population, and
-  point to `grid = "observed"` for non-consecutive schedules. The
-  homepage gains a key-definitions glossary (with presence-pattern
-  examples for endpoints and interior gaps) and a "Decisions the
-  package does not make" section delimiting what remains the
-  researcher's judgment.
-* Introduction vignette: a "which pipeline when" rule of thumb, the
-  stable `pattern` id, candidate windows, explicit bounds, and the
-  qualified recommendation semantics. Advanced vignette: new sections
-  on explicit analysis windows, auditing the recommendation (weights,
-  score decomposition, near ties, comparison-relative scores), the
-  planning population, and the fingerprint guard for saved plans.
-* README: design-fixed window example; population and fingerprint
-  noted.
-* New snapshot tests freeze the user-visible textual surfaces (plan
-  print, scope info, comparison and subset sentences, all three
-  justification styles), so any future change to printed output shows
-  up as a reviewable diff.
+* The backwards-compatibility fallback for plan objects saved by
+  pre-0.3 versions had never worked: with `$span` absent, `$` partial
+  matching picked up `span_reason`, its `"full"`/`"core"` label
+  coerced to `NA`, and `weasel_apply()`, `weasel_summarize_subset()`,
+  and `weasel_selectivity()` silently returned zero rows. Exact
+  `[["span"]]` indexing fixes it, with an end-to-end regression test.
+* `weasel_selectivity()` was row-order dependent under duplicated
+  (id, wave) rows with `at = "first"` and double-counted duplicated
+  rows with `at = "mean"`. Covariate values are now averaged within
+  each duplicated pair, a classed warning (`weasel_duplicates`) is
+  emitted, and the diagnostic is order-invariant.
+* `weasel_apply()` and `weasel_summarize_subset()` warn when the
+  returned data still contain duplicated (id, wave) rows and document
+  the contract: selection metrics count each pair once, output rows
+  are returned as-is.
+
+## New features
+
+* Explicit `lower`/`upper` bounds on `weasel_plan()`: the window is
+  recorded as an a-priori decision (`span_reason = "explicit"`) and
+  the justification text reports it as such instead of crediting an
+  automatic rule.
+* Core-window selection is inspectable: every candidate window and its
+  coverage is stored in `plan$span_candidates`, the objective (total
+  deduplicated respondent-wave coverage, earliest window on ties) is
+  documented, and exact coverage ties raise a classed warning
+  (`weasel_tied_windows`).
+* Qualified recommendations: `weasel_compare_scenarios()` gains
+  `tie_tolerance` and a `near_tie` column; the active weights and the
+  per-scenario score decomposition are attached as attributes
+  (`"weights"`, `"score_components"`); documentation and generated
+  sentences state that the score is a comparison-relative heuristic
+  ("highest composite score under the declared weights").
+* Plans record their planning population (rows and distinct ids in the
+  data versus ids and unique pairs observed in the span). The
+  denominator (`observed_in_span`) is printed, documented, and stated
+  in the generated justification text.
+* Plans store a structural fingerprint of their data;
+  `weasel_apply()`, `weasel_summarize_subset()`, and
+  `weasel_selectivity()` check explicitly supplied data against it and
+  warn on mismatch (`weasel_data_mismatch`), guarding saved plans
+  against silent reunion with the wrong data.
+* The wave-pattern summary gains a stable `pattern` id column that
+  survives filtering; `weasel_get_data_by_row()` accepts pattern ids
+  or pattern strings, so extraction after filtering can no longer
+  target the wrong pattern.
+* The scope gains optional `max_missing` and `require_endpoints`
+  constraints, mirroring plan scenarios exactly (locked by
+  cross-pipeline equivalence tests).
+
+## Documentation
+
+* Guide: corrected two descriptions that contradicted the
+  implementation (scope gap constraints described as inert; a pre-0.3
+  complete-grid, item-NA data model with a "focal outcome" step
+  presented as required), the pattern-table `n` description, the
+  `weasel_example()` return listing, and the footer installation
+  command (GitHub, not CRAN). All snippets start with
+  `library(weasel)` and run as pasted. The plan recipes include both
+  diagnostics; result notes cover recommendation semantics, candidate
+  windows, explicit bounds, `keep_data` and the fingerprint guard, the
+  planning population, and `grid = "observed"`. The homepage gains a
+  key-definitions glossary and a "Decisions the package does not make"
+  section.
+* Vignettes and README synced to all of the above, including a "which
+  pipeline when" rule of thumb; added `inst/CITATION` so
+  `citation("weasel")` matches `CITATION.cff` with the version read
+  from `DESCRIPTION` at build time.
+
+## Testing and infrastructure
+
+* Test suite doubled (240 to 480 assertions): cross-pipeline
+  equivalence properties, algebraic invariants, brute-force agreement
+  of the sensitivity sweep, row-order invariance, duplicate-contract
+  regressions, serialization round trips including the legacy
+  fallback, vocabulary and deprecation contracts, and snapshot tests
+  freezing every user-visible textual surface.
+* New `guide-snippets` workflow executes every guide code example
+  against the installed package on each push; the version-coherence
+  workflow additionally checks `CITATION.cff`; `.Rbuildignore` and
+  `.gitignore` exclude local development artifacts (`v3/`,
+  `update_github_repo.sh`), so local builds match CI builds.
 
 # weasel 0.3.1
 
