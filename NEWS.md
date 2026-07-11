@@ -172,6 +172,31 @@ pipelines. Renames ship with deprecation paths; one default changes.
 * README, both vignettes, the guide, and the bundled example script
   use the harmonized vocabulary throughout.
 
+Stage 6 of the 0.4.0 cycle: documentation enrichment and snapshot
+tests. Documentation and tests only; no package code changed.
+
+* Guide: the plan recipes now include the sensitivity and selectivity
+  diagnostics; the result notes explain `recommended`/`near_tie`
+  semantics, the candidate-window table, explicit a-priori bounds,
+  `keep_data` with the fingerprint guard, the planning population, and
+  point to `grid = "observed"` for non-consecutive schedules. The
+  homepage gains a key-definitions glossary (with presence-pattern
+  examples for endpoints and interior gaps) and a "Decisions the
+  package does not make" section delimiting what remains the
+  researcher's judgment.
+* Introduction vignette: a "which pipeline when" rule of thumb, the
+  stable `pattern` id, candidate windows, explicit bounds, and the
+  qualified recommendation semantics. Advanced vignette: new sections
+  on explicit analysis windows, auditing the recommendation (weights,
+  score decomposition, near ties, comparison-relative scores), the
+  planning population, and the fingerprint guard for saved plans.
+* README: design-fixed window example; population and fingerprint
+  noted.
+* New snapshot tests freeze the user-visible textual surfaces (plan
+  print, scope info, comparison and subset sentences, all three
+  justification styles), so any future change to printed output shows
+  up as a reviewable diff.
+
 # weasel 0.3.1
 
 Coherence and reproducibility release. No behavioural changes for

@@ -34,6 +34,14 @@ It offers two complementary pipelines:
 2. A **plan pipeline** for comparing predefined selection scenarios and
    generating methods-section text.
 
+A simple rule of thumb: start in the scope pipeline when you do not yet
+know what participation looks like in your panel, and move to the plan
+pipeline as soon as you are choosing between selection rules you intend
+to defend in writing. Both pipelines use the same constraint vocabulary
+(`min_present`, `max_missing`, `n_gap_max`, `max_gap_len`,
+`require_endpoints`), so a pattern you isolate while exploring
+translates directly into a scenario.
+
 ```{r setup}
 library(weasel)
 ```
@@ -110,8 +118,11 @@ weasel_print_table(
 )
 ```
 
-`weasel_get_data_by_row()` then pulls the original long-format rows
-behind any pattern row (or several rows at once), ready for analysis:
+The `pattern` column is a stable id: it survives filtering, so a value
+you spot in a filtered table can be passed straight to
+`weasel_get_data_by_row()` (the pattern string from `waves` works as a
+selector too). That function pulls the original long-format rows behind
+any pattern (or several at once), ready for analysis:
 
 ```{r}
 subset_row1 <- weasel_get_data_by_row(1)
@@ -158,7 +169,11 @@ plan_obj
 
 With `span = "core"` the package slides a window of `core_len`
 consecutive waves across the full wave range and picks the window with
-the highest average per-wave coverage.
+the highest average per-wave coverage; every candidate window is kept
+in `plan_obj$span_candidates`, and exact coverage ties warn. When the
+window is fixed by your study design, pass explicit `lower`/`upper`
+bounds instead of `span`; the plan then records the window as an
+a-priori decision and the justification text reports it as such.
 
 ```{r}
 comparison <- weasel_compare_scenarios(plan_obj)
@@ -169,7 +184,12 @@ The `score` column is computed from observed subset quality (coverage,
 endpoint rate, relative sample size, worst-case missingness, and gap
 structure), never from a scenario's configured tolerances; see
 `?weasel_compare_scenarios` for the exact formula and how to override
-the weights. A sentence version is available too:
+the weights. `recommended` flags the highest composite score under the
+declared weights, nothing more: `near_tie` warns when scenarios are
+practically indistinguishable, and the active weights plus the
+per-scenario score decomposition travel with the table as attributes
+(`attr(comparison, "weights")`, `attr(comparison, "score_components")`).
+A sentence version is available too:
 
 ```{r}
 cat(weasel_compare_to_sentence(comparison), "\n")

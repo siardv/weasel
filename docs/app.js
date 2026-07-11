@@ -117,7 +117,10 @@ const TREE = {
       "analysis is observed within the same bounded segment of the panel. " +
       "`span = \"full\"` includes every observed wave and is appropriate when the wave count " +
       "need not be fixed, for example in random-intercept models or survival analyses " +
-      "where respondents can have different observation lengths.",
+      "where respondents can have different observation lengths. If the window is fixed by " +
+      "the study design, skip `span` and pass explicit `lower`/`upper` bounds instead: the " +
+      "plan records the window as an a-priori decision and the justification text reports " +
+      "it as such.",
     yes: {
       label: "Yes, I need a fixed-length window",
       next: "result_plan_justify_core",
@@ -137,7 +140,9 @@ const TREE = {
       "This is typically the right choice for growth-curve models or any design " +
       "where a uniform set of L waves per respondent is analytically important. " +
       "`span = \"full\"` covers all observed waves and gives you the widest longitudinal " +
-      "window at the cost of greater within-window missingness variability.",
+      "window at the cost of greater within-window missingness variability. A window fixed " +
+      "by the study design can be supplied directly as explicit `lower`/`upper` bounds " +
+      "instead of `span`.",
     yes: {
       label: "Yes, I need a fixed-length window",
       next: "result_plan_core",
@@ -361,6 +366,14 @@ head(subset1)`,
         fn: "weasel_apply(p, scenario)",
         note: "produce the filtered long-format data frame for the chosen scenario",
       },
+      {
+        fn: "weasel_sensitivity(p, max_missing = 0:2)",
+        note: "sweep the tolerances: how strongly does the retained sample react?",
+      },
+      {
+        fn: 'weasel_selectivity(p, "anchored_strict")',
+        note: "compare retained and excluded respondents on covariates (standardized mean differences)",
+      },
     ],
     code: `library(weasel)
 
@@ -377,8 +390,18 @@ weasel_print_table(s$headline)
 weasel_print_table(s$per_wave_coverage, title = "Per-wave coverage")
 
 analysis_data <- weasel_apply(p, rec)
-dim(analysis_data)`,
-    note: null,
+dim(analysis_data)
+
+# audit the selection before committing to it
+weasel_print_table(weasel_sensitivity(p, max_missing = 0:2), n = 8)
+weasel_print_table(weasel_selectivity(p, "anchored_strict"), digits = 3)`,
+    note:
+      "`recommended` marks the highest composite score under the declared weights, nothing " +
+      "more: check the `near_tie` column and `attr(cmp, \"score_components\")` before treating " +
+      "it as a decision, and inspect `p$span_candidates` to see every window the core rule " +
+      "considered (exact coverage ties warn and pick the earliest). For biennial or " +
+      "year-labelled panels add `grid = \"observed\"`; for a design-fixed window pass explicit " +
+      "`lower`/`upper` bounds instead of `span`.",
   },
 
   result_plan_full: {
@@ -422,8 +445,18 @@ s <- weasel_summarize_subset(p, "anchored_balanced", d, "id", "time")
 cat(weasel_subset_to_sentence(s), "\\n")
 
 analysis_data <- weasel_apply(p, "anchored_balanced")
-dim(analysis_data)`,
-    note: null,
+dim(analysis_data)
+
+# how sensitive is the sample to the tolerances?
+weasel_print_table(weasel_sensitivity(p, max_missing = 0:2), n = 8)`,
+    note:
+      "Plans carry their data by default; use `keep_data = FALSE` before saving with " +
+      "`saveRDS()` and pass the data back in later. Reunions are guarded: explicitly supplied " +
+      "data are checked against the plan's structural fingerprint, and a mismatch warns " +
+      "(`weasel_data_mismatch`). The printed plan reports the planning population " +
+      "(respondents observed in the span versus all distinct ids in the data), which is the " +
+      "denominator behind every retention figure. For biennial or year-labelled panels add " +
+      "`grid = \"observed\"`.",
   },
 
   result_plan_justify_core: {
