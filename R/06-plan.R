@@ -442,7 +442,8 @@ weasel_plan <- function(data,
 #'
 #' @export
 print.weasel_plan <- function(x, digits = 3, ...) {
-  sp <- .weasel_or(x$span, .weasel_seq_int(x$lower, x$upper))
+  # exact indexing: $span would partial-match span_reason on legacy objects
+  sp <- .weasel_or(x[["span"]], .weasel_seq_int(x$lower, x$upper))
   grid_txt <- if (identical(x$grid, "observed")) {
     paste0(length(sp), " observed waves")
   } else {

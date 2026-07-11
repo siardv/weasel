@@ -27,6 +27,34 @@ No changes to computational behaviour.
 * The version-coherence workflow now also checks the `CITATION.cff`
   version against `DESCRIPTION`.
 
+Stage 2 of the 0.4.0 cycle: test scaffolding and CI hardening.
+Additive, plus one bug the new scaffolding exposed immediately.
+
+* Fixed: the backwards-compatibility fallback for plan objects saved
+  by pre-0.3 versions (which stored only the span bounds, not `$span`)
+  had never worked. `$` partial matching picked up `span_reason`
+  instead, its `"full"`/`"core"` label coerced to `NA`, and every wave
+  failed the span filter, so `weasel_apply()`,
+  `weasel_summarize_subset()`, and `weasel_selectivity()` silently
+  returned zero rows for such objects. Exact `[["span"]]` indexing in
+  `.weasel_plan_span()` and `print.weasel_plan()` fixes this; a
+  regression test now exercises the legacy path end to end.
+
+* New test suites lock the package's central methodological claims in
+  place before any further changes: cross-pipeline equivalence (the
+  scope constraints and an equivalent plan scenario must retain
+  identical respondents, on consecutive and observed grids, with
+  identical per-respondent metrics), algebraic invariants on the id
+  metrics and pattern tables, exact agreement between
+  `weasel_sensitivity()` and brute-force filtering, row-order
+  invariance of plans, duplicate-row neutrality in both pipelines, and
+  serialization round trips (including `keep_data = FALSE` reunion and
+  the pre-0.3 legacy fallback for plans without a stored `$span`).
+* New `guide-snippets` GitHub Actions workflow: every R code snippet
+  embedded in the guide is extracted and executed against the
+  installed package on each push, so guide examples can no longer
+  drift from the implementation without failing CI.
+
 # weasel 0.3.1
 
 Coherence and reproducibility release. No behavioural changes for

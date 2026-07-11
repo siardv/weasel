@@ -1,0 +1,66 @@
+# executes every R code snippet embedded in the guide (docs/app.js)
+# against the installed package, so guide examples cannot drift from
+# the implementation without failing CI; prose is not checked, code is
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+name: guide-snippets
+
+permissions: read-all
+
+jobs:
+  guide-snippets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          use-public-rspm: true
+
+      - name: Install package
+        run: R CMD INSTALL --no-docs .
+
+      - name: Extract snippets from docs/app.js
+        run: |
+          node -e '
+          const fs = require("fs"), vm = require("vm");
+          const src = fs.readFileSync("docs/app.js", "utf8");
+          vm.runInNewContext(src + "\n;__out(TREE);", {
+            document: { addEventListener() {} },
+            __out: (tree) => {
+              fs.mkdirSync("snippets", { recursive: true });
+              let n = 0;
+              for (const [key, node] of Object.entries(tree)) {
+                if (node && node.code) {
+                  fs.writeFileSync("snippets/" + key + ".R", node.code + "\n");
+                  n++;
+                }
+              }
+              console.log("extracted " + n + " snippets");
+              if (n === 0) process.exit(1);
+            },
+          });'
+
+      - name: Run snippets
+        run: |
+          fail=0
+          for f in snippets/*.R; do
+            name="$(basename "$f" .R)"
+            {
+              echo 'options(weasel.verbose = FALSE)'
+              echo 'your_data <- weasel::generate_weasel_dummy_data(n_ids = 120, n_times = 10, seed = 99)'
+              cat "$f"
+            } > "snippets/run_${name}.R"
+            if Rscript "snippets/run_${name}.R" > /dev/null 2> "snippets/err_${name}.log"; then
+              echo "PASS ${name}"
+            else
+              echo "FAIL ${name}"
+              cat "snippets/err_${name}.log"
+              fail=1
+            fi
+          done
+          exit $fail
