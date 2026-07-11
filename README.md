@@ -27,7 +27,10 @@ d <- generate_weasel_dummy_data(n_ids = 300, n_times = 12, seed = 1)
 
 # scenario planning
 p <- weasel_plan(d, id = "id", wave = "time", span = "core")
-p  # compact print: span, scenario table, attached data size
+p  # compact print: span, population, scenario table, attached data size
+
+# a design-fixed window instead of the automatic core rule
+p_fixed <- weasel_plan(d, id = "id", wave = "time", lower = 3, upper = 8)
 
 cmp <- weasel_compare_scenarios(p)
 weasel_print_table(cmp, title = "Scenarios")
@@ -76,6 +79,10 @@ strictly between a respondent's first and last observed wave).
   covariates (standardized mean differences) to check whether
   completeness-based selection skews the sample.
 * `weasel_scope_info()` prints the state of the active scope.
+* Plans record their planning population (the denominator behind every
+  retention figure) and a structural fingerprint of their data;
+  reuniting a saved plan with different data warns
+  (`weasel_data_mismatch`).
 
 ## Options
 

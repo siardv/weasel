@@ -188,6 +188,21 @@ nrow(weasel_apply(p_light, "lenient", data = long_data))
 `weasel_sensitivity()` and `weasel_justify_subset()` keep working on
 such plans because they only need the stored metrics.
 
+Reuniting a saved plan with the wrong data is guarded: every plan
+stores a structural fingerprint of the data it was built from, and
+explicitly supplied data are checked against it. A mismatch produces a
+classed warning (`weasel_data_mismatch`) rather than a silent, invalid
+subset:
+
+```{r}
+d_other <- long_data[-(1:10), ]
+msg <- tryCatch(
+  weasel_apply(p_light, "lenient", data = d_other),
+  warning = function(w) conditionMessage(w)
+)
+substr(msg, 1, 78)
+```
+
 ## Span selection in detail
 
 `span = "core"` slides a window of `core_len` consecutive grid waves
@@ -200,6 +215,56 @@ keep the entire range:
 ```{r}
 plan_full <- weasel_plan(long_data, "id", "time", span = "full")
 c(lower = plan_full$lower, upper = plan_full$upper)
+```
+
+## Explicit analysis windows
+
+When the window is determined by the study design rather than by
+coverage, pass explicit bounds; the plan records the window as an
+a-priori decision (`span_reason = "explicit"`), and
+`weasel_justify_subset()` reports it as such instead of crediting an
+automatic rule:
+
+```{r}
+plan_fixed <- weasel_plan(long_data, "id", "time", lower = 3, upper = 10)
+plan_fixed$span_reason
+```
+
+For automatic core windows, the selection is inspectable: every
+candidate window and its coverage is stored, the chosen one is
+flagged, and exact coverage ties raise a classed warning
+(`weasel_tied_windows`) instead of being resolved silently:
+
+```{r}
+weasel_print_table(plan_custom$span_candidates, digits = 0)
+```
+
+## Auditing the recommendation
+
+`recommended` marks the highest composite score under the declared
+weights, nothing more. The active weights and the per-scenario score
+decomposition travel with the comparison table, `near_tie` flags
+scenarios the score cannot meaningfully separate (tune with
+`tie_tolerance`), and because the size term is normalised within the
+supplied scenario set, scores are comparison-relative rather than
+absolute properties of a scenario:
+
+```{r}
+cmp_audit <- weasel_compare_scenarios(plan_custom)
+attr(cmp_audit, "weights")
+weasel_print_table(attr(cmp_audit, "score_components"), digits = 3)
+cmp_audit[c("scenario", "score", "recommended", "near_tie")]
+```
+
+## The planning population
+
+Respondents enter the planning population when they are observed at
+least once inside the span; every retention proportion is relative to
+that population, not to the full panel. Plans store and print the
+counts, and the justification text states the denominator explicitly:
+
+```{r}
+plan_custom$population
 ```
 
 ## Auditing per-respondent metrics

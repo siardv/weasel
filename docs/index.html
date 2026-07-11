@@ -76,6 +76,31 @@
           </div>
         </div>
       </div>
+
+      <div class="overview-grid">
+        <div class="overview-col">
+          <h2 class="ov-heading">Key definitions</h2>
+          <ul class="ov-list">
+            <li><strong>Observed wave</strong>: a row for that (id, wave) pair exists in the long data; a missed wave is an absent row.</li>
+            <li><strong>Span and grid</strong>: the analysis window and its scheduled waves; <code>grid = "observed"</code> uses only waves that occur in the data (biennial panels, waves recorded as years).</li>
+            <li><strong>Endpoints</strong>: observed at the first and last wave of the span. <code>.. 3 4 5 ..</code> misses both endpoints yet has no interior gap.</li>
+            <li><strong>Interior gap</strong>: a run of missing waves strictly between a respondent's first and last observed wave. <code>1 2 .. 5 6 7</code> has one gap of length 2; <code>1 . 3 . 5 . 7</code> has three gaps of length 1; late entry and early exit are not gaps.</li>
+            <li><strong>Constraints</strong>: <code>min_present</code>, <code>max_missing</code>, <code>n_gap_max</code>, <code>max_gap_len</code>, <code>require_endpoints</code>; the same names work in the scope and in plan scenario tables.</li>
+            <li><strong>Planning population</strong>: respondents observed at least once inside the span; every retention figure is relative to it, and plans report it.</li>
+            <li><strong>Recommendation</strong>: the highest composite score under declared, overridable weights; near-ties are flagged, and the score decomposition travels with the table.</li>
+          </ul>
+        </div>
+        <div class="overview-col">
+          <h2 class="ov-heading">Decisions the package does not make</h2>
+          <ul class="ov-list">
+            <li>What the causal estimand is, or which substantive variables must be observed for your analysis.</li>
+            <li>Whether attrition is ignorable (missing at random) or whether a complete-case restriction biases your estimates; <code>weasel_selectivity()</code> helps you check, it does not decide.</li>
+            <li>Whether an automatically selected core window matches the substantive time period your question needs.</li>
+            <li>Whether the highest-scoring scenario is optimal for your analysis; the score is a transparent heuristic, not a validated decision rule.</li>
+            <li>Whether weighting or imputation should follow selection.</li>
+          </ul>
+        </div>
+      </div>
     </div>
   </section>
 
