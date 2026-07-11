@@ -370,8 +370,10 @@ weasel_compare_to_sentence <- function(cmp, digits = 3) {
 #'   first and last grid waves inside the requested range.
 #' @param scenarios Optional data frame of custom scenarios with the
 #'   columns `scenario`, `require_endpoints`, `max_missing`,
-#'   `n_gap_max`, `max_gap_max`. The table is validated; missing
-#'   columns raise an error.
+#'   `n_gap_max`, `max_gap_len`. The table is validated; missing
+#'   columns raise an error. The pre-0.4 column name `max_gap_max` is
+#'   still accepted with a deprecation warning (class
+#'   `weasel_deprecated`).
 #' @param grid How the wave grid inside the span is defined.
 #'   `"consecutive"` (default) treats every integer between the span
 #'   bounds as a scheduled wave; `"observed"` uses only wave values
@@ -485,7 +487,7 @@ weasel_plan <- function(data,
       require_endpoints = c(TRUE, TRUE, FALSE),
       max_missing       = c(0, 1, 2),
       n_gap_max         = c(0, 1, 2),
-      max_gap_max       = c(0, 1, 2),
+      max_gap_len       = c(0, 1, 2),
       stringsAsFactors  = FALSE
     )
   }
@@ -494,7 +496,7 @@ weasel_plan <- function(data,
   keep_masks <- lapply(seq_len(nrow(scenarios)), function(i) {
     keep <- idm$n_missing <= scenarios$max_missing[i] &
       idm$n_gap <= scenarios$n_gap_max[i] &
-      idm$max_gap <= scenarios$max_gap_max[i]
+      idm$max_gap <= scenarios$max_gap_len[i]
     if (isTRUE(scenarios$require_endpoints[i])) {
       keep <- keep & idm$has_lower & idm$has_upper
     }

@@ -35,20 +35,20 @@ test_that("plan metrics use interior gaps and endpoint flags", {
 test_that("custom scenario tables are validated", {
   d <- make_fixture()
   bad <- data.frame(scenario = "x", require_endpoints = TRUE,
-                    max_missing = 1)  # missing n_gap_max, max_gap_max
+                    max_missing = 1)  # missing n_gap_max, max_gap_len
   expect_error(weasel_plan(d, "id", "time", span = "full", scenarios = bad),
                "missing required column")
 
   dup <- data.frame(
     scenario = c("x", "x"), require_endpoints = c(TRUE, FALSE),
-    max_missing = c(0, 1), n_gap_max = c(0, 1), max_gap_max = c(0, 1)
+    max_missing = c(0, 1), n_gap_max = c(0, 1), max_gap_len = c(0, 1)
   )
   expect_error(weasel_plan(d, "id", "time", span = "full", scenarios = dup),
                "unique")
 
   neg <- data.frame(
     scenario = "x", require_endpoints = TRUE,
-    max_missing = -1, n_gap_max = 0, max_gap_max = 0
+    max_missing = -1, n_gap_max = 0, max_gap_len = 0
   )
   expect_error(weasel_plan(d, "id", "time", span = "full", scenarios = neg),
                ">= 0")
@@ -79,7 +79,7 @@ test_that("empty scenarios get NA scores and are never recommended", {
   imp <- data.frame(
     scenario = c("impossible", "lenient"),
     require_endpoints = c(TRUE, FALSE),
-    max_missing = c(0, 8), n_gap_max = c(0, 8), max_gap_max = c(0, 8)
+    max_missing = c(0, 8), n_gap_max = c(0, 8), max_gap_len = c(0, 8)
   )
   d2 <- d[d$id %in% c("d1", "f1"), ]  # nobody has both endpoints
   p <- weasel_plan(d2, "id", "time", span = "full", scenarios = imp)

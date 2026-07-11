@@ -8,13 +8,18 @@ set_weasel_scope(
   data,
   id,
   wave,
-  size = NULL,
+  min_present = 1L,
+  max_missing = NULL,
+  max_gap_len = NULL,
+  n_gap_max = NULL,
+  require_endpoints = FALSE,
   lower = NULL,
   upper = NULL,
-  gap = NULL,
-  n_gap = NULL,
   grid = c("consecutive", "observed"),
-  override = TRUE
+  override = TRUE,
+  size = NULL,
+  gap = NULL,
+  n_gap = NULL
 )
 }
 \arguments{
@@ -27,22 +32,31 @@ observed at a wave if a row with that (id, wave) pair exists.}
 \item{wave}{Name of the wave/time column. Must be numeric with
 integer-valued entries.}
 
-\item{size}{Optional integer vector of acceptable per-respondent
-observation counts; respondents with fewer than \code{min(size)}
-observed waves are dropped by \code{\link[=weasel_reshape_to_wide]{weasel_reshape_to_wide()}}. Defaults
-to \verb{min(3, span length)} through the span length.}
+\item{min_present}{Single integer (default 1); respondents with
+fewer observed waves inside the span are dropped by
+\code{\link[=weasel_reshape_to_wide]{weasel_reshape_to_wide()}}. The default keeps every respondent
+with at least one observed wave, so exploration shows the full
+participation landscape unless you narrow it.}
+
+\item{max_missing}{Optional integer; maximum allowed number of
+missing waves inside the span. \code{NULL} (default) applies no
+constraint.}
+
+\item{max_gap_len}{Optional integer; maximum allowed length of an
+interior gap (a run of missing waves strictly between a
+respondent's first and last observed wave inside the span).
+\code{NULL} (default) applies no constraint.}
+
+\item{n_gap_max}{Optional integer; maximum allowed number of
+interior gaps. \code{NULL} (default) applies no constraint.}
+
+\item{require_endpoints}{If \code{TRUE}, only respondents observed at
+both the first and last wave of the span are kept. Default
+\code{FALSE}.}
 
 \item{lower}{Optional lower bound of the wave range.}
 
 \item{upper}{Optional upper bound of the wave range.}
-
-\item{gap}{Optional integer; maximum allowed length of an interior
-gap (a run of missing waves strictly between a respondent's first
-and last observed wave inside the span). \code{NULL} (default) applies
-no constraint.}
-
-\item{n_gap}{Optional integer; maximum allowed number of interior
-gaps. \code{NULL} (default) applies no constraint.}
 
 \item{grid}{How the wave grid inside the span is defined.
 \code{"consecutive"} (default) treats every integer between \code{lower} and
@@ -54,6 +68,12 @@ contains waves that no respondent has.}
 
 \item{override}{If \code{TRUE}, overwrite any existing scope. If \code{FALSE}
 and a scope already exists, an error is raised.}
+
+\item{size, gap, n_gap}{Deprecated aliases (classed warning
+\code{weasel_deprecated}): use \code{min_present} (for \code{size}, whose minimum
+is used), \code{max_gap_len} (for \code{gap}), and \code{n_gap_max} (for
+\code{n_gap}). An explicitly supplied new-name argument takes
+precedence over its alias.}
 }
 \value{
 The scope environment, invisibly.
@@ -72,7 +92,7 @@ d <- generate_weasel_dummy_data(n_ids = 50, n_times = 8, seed = 1)
 set_weasel_scope(d, "id", "time", upper = 8)
 
 # only respondents whose interior gaps are at most 1 wave long
-set_weasel_scope(d, "id", "time", gap = 1)
+set_weasel_scope(d, "id", "time", max_gap_len = 1)
 
 # biennial schedule: use the observed grid
 b <- generate_weasel_dummy_data(n_ids = 30, waves = seq(2008, 2018, 2),

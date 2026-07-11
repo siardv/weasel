@@ -1,6 +1,6 @@
 test_that("old names forward to the new ones with a classed warning", {
   d <- make_fixture()
-  set_weasel_scope(d, "id", "time", size = 1)
+  set_weasel_scope(d, "id", "time", min_present = 1)
   on.exit(weasel_clear_scope(), add = TRUE)
   evaluate_weasel_scope()
 

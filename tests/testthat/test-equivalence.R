@@ -2,21 +2,25 @@
 # constraints must retain identical respondents through the scope and
 # plan pipelines; these tests lock the shared vocabulary in place
 
-equiv_scenario <- function(min_present, gap, n_gap, L) {
+equiv_scenario <- function(min_present, max_gap_len, n_gap_max, L,
+                           require_endpoints = FALSE) {
   data.frame(
     scenario          = "equiv",
-    require_endpoints = FALSE,
+    require_endpoints = require_endpoints,
     max_missing       = L - min_present,
-    n_gap_max         = if (is.null(n_gap)) L else n_gap,
-    max_gap_max       = if (is.null(gap)) L else gap,
+    n_gap_max         = if (is.null(n_gap_max)) L else n_gap_max,
+    max_gap_len       = if (is.null(max_gap_len)) L else max_gap_len,
     stringsAsFactors  = FALSE
   )
 }
 
-scope_kept_ids <- function(d, size, gap, n_gap, grid = "consecutive") {
+scope_kept_ids <- function(d, min_present, max_gap_len, n_gap_max,
+                           grid = "consecutive",
+                           require_endpoints = FALSE) {
   suppressMessages(
-    set_weasel_scope(d, "id", "time", size = size, gap = gap,
-                     n_gap = n_gap, grid = grid)
+    set_weasel_scope(d, "id", "time", min_present = min_present,
+                     max_gap_len = max_gap_len, n_gap_max = n_gap_max,
+                     require_endpoints = require_endpoints, grid = grid)
   )
   on.exit(weasel_clear_scope(), add = TRUE)
   pv <- suppressMessages(suppressWarnings(weasel_reshape_to_wide()))
@@ -29,17 +33,25 @@ test_that("scope constraints equal an equivalent plan scenario (consecutive)", {
   L <- length(p0$span)
 
   combos <- list(
-    list(size = 1L, gap = NULL, n_gap = NULL),
-    list(size = 3L, gap = 1L,   n_gap = NULL),
-    list(size = 4L, gap = 2L,   n_gap = 1L),
-    list(size = 6L, gap = 1L,   n_gap = 1L)
+    list(mp = 1L, gl = NULL, ng = NULL),
+    list(mp = 3L, gl = 1L,   ng = NULL),
+    list(mp = 4L, gl = 2L,   ng = 1L),
+    list(mp = 6L, gl = 1L,   ng = 1L)
   )
   for (cb in combos) {
-    kept_scope <- scope_kept_ids(d, cb$size, cb$gap, cb$n_gap)
+    kept_scope <- scope_kept_ids(d, cb$mp, cb$gl, cb$ng)
     p <- weasel_plan(d, "id", "time", span = "full",
-                     scenarios = equiv_scenario(cb$size, cb$gap, cb$n_gap, L))
+                     scenarios = equiv_scenario(cb$mp, cb$gl, cb$ng, L))
     expect_setequal(kept_scope, p$plan$ids[[1]])
   }
+
+  # endpoints: the scope constraint equals an anchored scenario
+  kept_anchored <- scope_kept_ids(d, 3L, 1L, NULL,
+                                  require_endpoints = TRUE)
+  p_anch <- weasel_plan(d, "id", "time", span = "full",
+                        scenarios = equiv_scenario(3L, 1L, NULL, L,
+                                                   require_endpoints = TRUE))
+  expect_setequal(kept_anchored, p_anch$plan$ids[[1]])
 })
 
 test_that("scope constraints equal an equivalent plan scenario (observed)", {
@@ -48,8 +60,8 @@ test_that("scope constraints equal an equivalent plan scenario (observed)", {
   p0 <- weasel_plan(d, "id", "time", span = "full", grid = "observed")
   L <- length(p0$span)
 
-  kept_scope <- scope_kept_ids(d, size = 4L, gap = 1L, n_gap = 1L,
-                               grid = "observed")
+  kept_scope <- scope_kept_ids(d, min_present = 4L, max_gap_len = 1L,
+                               n_gap_max = 1L, grid = "observed")
   p <- weasel_plan(d, "id", "time", span = "full", grid = "observed",
                    scenarios = equiv_scenario(4L, 1L, 1L, L))
   expect_setequal(kept_scope, p$plan$ids[[1]])
@@ -57,7 +69,7 @@ test_that("scope constraints equal an equivalent plan scenario (observed)", {
 
 test_that("scope and plan compute identical per-respondent metrics", {
   d <- generate_weasel_dummy_data(n_ids = 60, n_times = 9, seed = 73)
-  suppressMessages(set_weasel_scope(d, "id", "time", size = 1))
+  suppressMessages(set_weasel_scope(d, "id", "time", min_present = 1))
   on.exit(weasel_clear_scope(), add = TRUE)
   suppressMessages(weasel_reshape_to_wide())
   sm <- weasel:::the$scope$scope_metrics

@@ -8,9 +8,10 @@ weasel_scope_info()
 }
 \value{
 Invisibly, a list with the scope settings (\code{id}, \code{wave},
-\code{grid}, \code{lower}, \code{upper}, \code{span}, \code{size}, \code{gap}, \code{n_gap}) and the
-progress counters (\code{n_rows}, \code{n_kept}, \code{n_patterns}), or \code{NULL}
-when no scope is active.
+\code{grid}, \code{lower}, \code{upper}, \code{span}, \code{min_present}, \code{max_missing},
+\code{max_gap_len}, \code{n_gap_max}, \code{require_endpoints}) and the progress
+counters (\code{n_rows}, \code{n_kept}, \code{n_patterns}), or \code{NULL} when no
+scope is active.
 }
 \description{
 Prints a compact status report of the active scope: the bound data,
@@ -20,7 +21,7 @@ scope is set.
 }
 \examples{
 d <- generate_weasel_dummy_data(n_ids = 30, n_times = 6, seed = 1)
-set_weasel_scope(d, "id", "time", gap = 1)
+set_weasel_scope(d, "id", "time", max_gap_len = 1)
 weasel_scope_info()
 weasel_reshape_to_wide()
 weasel_summarize_waves()

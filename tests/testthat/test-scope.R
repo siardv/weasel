@@ -1,6 +1,6 @@
 test_that("scope pipeline recovers known patterns and counts", {
   d <- make_fixture()
-  set_weasel_scope(d, "id", "time", size = 1)
+  set_weasel_scope(d, "id", "time", min_present = 1)
   on.exit(weasel_clear_scope(), add = TRUE)
   evaluate_weasel_scope()
   weasel_reshape_to_wide()
@@ -28,7 +28,7 @@ test_that("scope pipeline recovers known patterns and counts", {
 
 test_that("weasel_get_data_by_row returns matching respondents", {
   d <- make_fixture()
-  set_weasel_scope(d, "id", "time", size = 1)
+  set_weasel_scope(d, "id", "time", min_present = 1)
   on.exit(weasel_clear_scope(), add = TRUE)
   evaluate_weasel_scope()
   weasel_reshape_to_wide()
@@ -49,16 +49,16 @@ test_that("weasel_get_data_by_row returns matching respondents", {
 test_that("interior gap constraints drop the right respondents", {
   d <- make_fixture()
 
-  # gap = 1: c1 (gap of 2) must be dropped, b1 and e1 kept
-  set_weasel_scope(d, "id", "time", size = 1, gap = 1)
+  # max_gap_len = 1: c1 (gap of 2) must be dropped, b1 and e1 kept
+  set_weasel_scope(d, "id", "time", min_present = 1, max_gap_len = 1)
   on.exit(weasel_clear_scope(), add = TRUE)
   evaluate_weasel_scope()
   pv <- weasel_reshape_to_wide()
   expect_false("c1" %in% pv$id)
   expect_true(all(c("a1", "b1", "e1") %in% pv$id))
 
-  # n_gap = 1: e1 (three gaps) must also be dropped
-  set_weasel_scope(d, "id", "time", size = 1, gap = 2, n_gap = 1)
+  # n_gap_max = 1: e1 (three gaps) must also be dropped
+  set_weasel_scope(d, "id", "time", min_present = 1, max_gap_len = 2, n_gap_max = 1)
   pv2 <- weasel_reshape_to_wide()
   expect_false("e1" %in% pv2$id)
   expect_true(all(c("b1", "c1", "d1") %in% pv2$id))
@@ -66,7 +66,7 @@ test_that("interior gap constraints drop the right respondents", {
 
 test_that("a single surviving respondent no longer breaks the summary", {
   one <- data.frame(id = "only", time = c(1, 2, 4), stringsAsFactors = FALSE)
-  set_weasel_scope(one, "id", "time", size = 1)
+  set_weasel_scope(one, "id", "time", min_present = 1)
   on.exit(weasel_clear_scope(), add = TRUE)
   # wave 3 has no observations at all, which now warns (once per scope)
   expect_warning(evaluate_weasel_scope(), class = "weasel_empty_waves")
@@ -85,11 +85,11 @@ test_that("scope validates inputs eagerly and manages state cleanly", {
   expect_error(set_weasel_scope(d, "id", "nope"), "not found")
 
   # validation happens at set time, not several steps later
-  expect_error(set_weasel_scope(d, "id", "time", gap = -1), "non-negative")
-  expect_error(set_weasel_scope(d, "id", "time", n_gap = NA), "non-negative")
+  expect_error(set_weasel_scope(d, "id", "time", max_gap_len = -1), "non-negative")
+  expect_error(set_weasel_scope(d, "id", "time", n_gap_max = NA), "non-negative")
   expect_error(set_weasel_scope(d, "id", "time", lower = 5, upper = 2),
                ">= lower")
-  expect_error(set_weasel_scope(d, "id", "time", size = 0), "positive")
+  expect_error(set_weasel_scope(d, "id", "time", min_present = 0), ">= 1")
 
   weasel_clear_scope()
   expect_error(evaluate_weasel_scope(), class = "weasel_error_no_scope")
@@ -111,14 +111,14 @@ test_that("scope state never touches the global environment", {
 
 test_that("a too-short span fails with a clear message", {
   tiny <- data.frame(id = rep(1:5, each = 2), time = rep(1:2, 5))
-  set_weasel_scope(tiny, "id", "time", size = 3)
+  set_weasel_scope(tiny, "id", "time", min_present = 3)
   on.exit(weasel_clear_scope(), add = TRUE)
-  expect_error(evaluate_weasel_scope(), "no valid window size")
+  expect_error(evaluate_weasel_scope(), "exceeds the span")
 })
 
 test_that("scope pipeline supports observed grids", {
   d <- expand.grid(id = 1:10, time = seq(2, 14, by = 3))  # 2, 5, 8, 11, 14
-  set_weasel_scope(d, "id", "time", grid = "observed", size = 1)
+  set_weasel_scope(d, "id", "time", grid = "observed", min_present = 1)
   on.exit(weasel_clear_scope(), add = TRUE)
   expect_no_warning(evaluate_weasel_scope())
   pv <- weasel_reshape_to_wide()
@@ -129,7 +129,7 @@ test_that("scope pipeline supports observed grids", {
 
   # the consecutive default warns about structurally empty waves,
   # once per scope
-  set_weasel_scope(d, "id", "time", size = 1)
+  set_weasel_scope(d, "id", "time", min_present = 1)
   expect_warning(evaluate_weasel_scope(), class = "weasel_empty_waves")
   expect_no_warning(weasel_reshape_to_wide())
 })
@@ -139,12 +139,12 @@ test_that("weasel_scope_info reports settings and pipeline stage", {
   expect_output(weasel_scope_info(), "no active")
 
   d <- make_fixture()
-  set_weasel_scope(d, "id", "time", gap = 1, size = 1)
+  set_weasel_scope(d, "id", "time", max_gap_len = 1, min_present = 1)
   on.exit(weasel_clear_scope(), add = TRUE)
   out <- capture.output(info <- weasel_scope_info())
   expect_true(any(grepl("stage:", out)))
   expect_true(any(grepl("not evaluated yet", out)))
-  expect_equal(info$gap, 1L)
+  expect_equal(info$max_gap_len, 1L)
   expect_true(is.na(info$n_kept))
 
   weasel_reshape_to_wide()
@@ -158,7 +158,7 @@ test_that("weasel_scope_info reports settings and pipeline stage", {
 test_that("duplicated rows warn in the scope pipeline too", {
   d <- make_fixture()
   dd <- rbind(d, d[1:3, ])
-  set_weasel_scope(dd, "id", "time", size = 1)
+  set_weasel_scope(dd, "id", "time", min_present = 1)
   on.exit(weasel_clear_scope(), add = TRUE)
   expect_warning(weasel_reshape_to_wide(), class = "weasel_duplicates")
 })

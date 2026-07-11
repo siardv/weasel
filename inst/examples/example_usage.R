@@ -18,7 +18,7 @@ set_weasel_scope(
   wave = "time",
   lower = 2,
   upper = 11,
-  gap = 2      # drop respondents with any interior gap longer than 2 waves
+  max_gap_len = 2  # drop respondents with any interior gap longer than 2 waves
 )
 evaluate_weasel_scope()
 weasel_reshape_to_wide()

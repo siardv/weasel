@@ -51,7 +51,7 @@ my_scenarios <- data.frame(
   require_endpoints = c(TRUE, TRUE, FALSE),
   max_missing       = c(0, 2, 4),
   n_gap_max         = c(0, 1, 4),
-  max_gap_max       = c(0, 2, 4)
+  max_gap_len       = c(0, 2, 4)
 )
 
 plan_custom <- weasel_plan(
@@ -146,7 +146,7 @@ sens <- weasel_sensitivity(
   require_endpoints = c(TRUE, FALSE),
   max_missing = 0:2,
   n_gap_max = 0:1,
-  max_gap_max = 0:2
+  max_gap_len = 0:2
 )
 weasel_print_table(sens, title = "Tolerance sweep", n = 10)
 ```
@@ -217,19 +217,20 @@ table(m$n_gap)
 
 ## Scope pipeline constraints
 
-The exploratory pipeline accepts the same structural ideas. The `size`
-argument controls the minimum number of observed waves a respondent
-needs to be kept; `gap` and `n_gap` apply interior-gap constraints at
-reshape time:
+The exploratory pipeline accepts the same structural vocabulary as the
+scenario tables. `min_present` sets the minimum number of observed
+waves a respondent needs to be kept (default 1, so exploration shows
+everyone); `max_missing`, `max_gap_len`, `n_gap_max`, and
+`require_endpoints` apply the same constraints a plan scenario would:
 
 ```{r}
 set_weasel_scope(
   long_data,
   id = "id", wave = "time",
   lower = 2, upper = 11,
-  size = 6,        # at least 6 observed waves within the span
-  gap = 1,         # no interior gap longer than 1 wave
-  n_gap = 2        # at most 2 interior gaps
+  min_present = 6,   # at least 6 observed waves within the span
+  max_gap_len = 1,   # no interior gap longer than 1 wave
+  n_gap_max = 2      # at most 2 interior gaps
 )
 evaluate_weasel_scope()
 weasel_reshape_to_wide()

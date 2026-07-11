@@ -139,6 +139,39 @@ default arguments are unchanged.
   no way to see the original row numbers, so extraction after
   filtering could silently target the wrong pattern.
 
+Stage 5 of the 0.4.0 cycle: one constraint vocabulary across both
+pipelines. Renames ship with deprecation paths; one default changes.
+
+* Harmonized constraint names: `min_present`, `max_missing`,
+  `n_gap_max`, `max_gap_len`, `require_endpoints`. In
+  `set_weasel_scope()`, `size` becomes `min_present` (a single
+  integer; the old vector form's minimum is used through the alias),
+  `gap` becomes `max_gap_len`, and `n_gap` becomes `n_gap_max`. The
+  deprecated aliases keep working through the 0.x series with classed
+  warnings (`weasel_deprecated`), and an explicitly supplied new-name
+  argument always wins over its alias.
+* The scope gains optional `max_missing` and `require_endpoints`
+  constraints, so the exploratory pipeline can preview exactly what a
+  plan scenario would retain; the cross-pipeline equivalence tests now
+  cover the anchored case too.
+* Scenario tables use `max_gap_len` in place of the double-superlative
+  `max_gap_max`. The old column name is accepted with a deprecation
+  warning, plans saved by older versions keep working (the
+  justification generator reads either column), and
+  `weasel_sensitivity()` renames its argument and output column
+  accordingly, keeping `max_gap_max` as a deprecated argument alias.
+* The scope's default minimum presence is now `min_present = 1`:
+  exploration shows every respondent with at least one observed wave
+  instead of silently dropping those with fewer than three. Set
+  `min_present = 3` to reproduce the previous default; the
+  drop-accounting message reports exclusions either way.
+* The `recommended` column keeps its name: with the declared-weights
+  wording, the `near_tie` flag, and the exposed score decomposition
+  from stage 4, its meaning is now explicit at the source, which is
+  where the ambiguity actually lived.
+* README, both vignettes, the guide, and the bundled example script
+  use the harmonized vocabulary throughout.
+
 # weasel 0.3.1
 
 Coherence and reproducibility release. No behavioural changes for

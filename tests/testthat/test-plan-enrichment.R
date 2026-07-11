@@ -72,7 +72,7 @@ test_that("scores expose weights and components; near ties are flagged", {
   twins <- data.frame(
     scenario = c("twin_a", "twin_b"),
     require_endpoints = FALSE,
-    max_missing = 2, n_gap_max = 2, max_gap_max = 2
+    max_missing = 2, n_gap_max = 2, max_gap_len = 2
   )
   pt <- weasel_plan(d, "id", "time", span = "full", scenarios = twins)
   ct <- weasel_compare_scenarios(pt)
@@ -131,7 +131,7 @@ test_that("fingerprints catch reunions with mismatched data", {
 
 test_that("pattern ids survive filtering and drive extraction", {
   d <- make_fixture()
-  suppressMessages(set_weasel_scope(d, "id", "time", size = 1))
+  suppressMessages(set_weasel_scope(d, "id", "time", min_present = 1))
   on.exit(weasel_clear_scope(), add = TRUE)
   suppressMessages(weasel_reshape_to_wide())
   v <- weasel_summarize_waves()

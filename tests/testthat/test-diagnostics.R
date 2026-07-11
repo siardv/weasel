@@ -3,32 +3,32 @@ test_that("sensitivity sweep is complete, bounded, and monotone", {
   p <- weasel_plan(d, "id", "time", span = "full")
   s <- weasel_sensitivity(p, require_endpoints = c(TRUE, FALSE),
                           max_missing = 0:3, n_gap_max = 0:2,
-                          max_gap_max = 0:2)
+                          max_gap_len = 0:2)
 
   expect_equal(nrow(s), 2 * 4 * 3 * 3)
   expect_named(s, c("require_endpoints", "max_missing", "n_gap_max",
-                    "max_gap_max", "n_ids", "prop_ids",
+                    "max_gap_len", "n_ids", "prop_ids",
                     "mean_prop_present"))
   n_total <- nrow(p$id_metrics)
   expect_true(all(s$n_ids >= 0 & s$n_ids <= n_total))
   expect_equal(s$prop_ids, s$n_ids / n_total)
 
   # loosening the missingness tolerance never shrinks the sample
-  base <- s[!s$require_endpoints & s$n_gap_max == 2 & s$max_gap_max == 2, ]
+  base <- s[!s$require_endpoints & s$n_gap_max == 2 & s$max_gap_len == 2, ]
   base <- base[order(base$max_missing), ]
   expect_true(all(diff(base$n_ids) >= 0))
 
   # requiring endpoints can only reduce the sample
-  key <- paste(s$max_missing, s$n_gap_max, s$max_gap_max)
+  key <- paste(s$max_missing, s$n_gap_max, s$max_gap_len)
   a <- s[s$require_endpoints, ]
   f <- s[!s$require_endpoints, ]
-  a <- a[order(paste(a$max_missing, a$n_gap_max, a$max_gap_max)), ]
-  f <- f[order(paste(f$max_missing, f$n_gap_max, f$max_gap_max)), ]
+  a <- a[order(paste(a$max_missing, a$n_gap_max, a$max_gap_len)), ]
+  f <- f[order(paste(f$max_missing, f$n_gap_max, f$max_gap_len)), ]
   expect_true(all(a$n_ids <= f$n_ids))
 
   # the plan's own scenarios are reproduced by matching combinations
   bal <- s[s$require_endpoints & s$max_missing == 1 &
-             s$n_gap_max == 1 & s$max_gap_max == 1, ]
+             s$n_gap_max == 1 & s$max_gap_len == 1, ]
   expect_equal(bal$n_ids,
                p$plan$n_ids[p$plan$scenario == "anchored_balanced"])
 
@@ -87,7 +87,7 @@ test_that("diagnostics work without attached data where possible", {
   p <- weasel_plan(d, "id", "time", span = "full", keep_data = FALSE)
 
   s <- weasel_sensitivity(p, max_missing = 0:1, n_gap_max = 0:1,
-                          max_gap_max = 0:1)
+                          max_gap_len = 0:1)
   expect_gt(nrow(s), 0)
 
   expect_error(weasel_selectivity(p, "lenient"), "keep_data")

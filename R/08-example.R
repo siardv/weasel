@@ -20,7 +20,7 @@ weasel_example <- function(seed = 42) {
   long_data <- generate_weasel_dummy_data(seed = seed)
   on.exit(weasel_clear_scope(), add = TRUE)
 
-  set_weasel_scope(long_data, id = "id", wave = "time", gap = 2)
+  set_weasel_scope(long_data, id = "id", wave = "time", max_gap_len = 2)
   evaluate_weasel_scope()
   weasel_reshape_to_wide()
   weasel_summarize_waves()

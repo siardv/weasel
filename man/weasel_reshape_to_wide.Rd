@@ -12,10 +12,11 @@ The pivot data frame, invisibly.
 \description{
 Builds a respondent x wave data frame where each cell contains the
 wave number if the respondent is observed, and \code{NA} otherwise.
-Respondents with fewer than \verb{min(valid size)} observed waves are
-dropped, and the optional \code{gap}/\code{n_gap} constraints from
-\code{\link[=set_weasel_scope]{set_weasel_scope()}} are applied to interior gaps. Duplicated
-(id, wave) rows are counted once and trigger a warning.
+Respondents with fewer than \code{min_present} observed waves are
+dropped, and the optional \code{max_missing}, \code{max_gap_len}, \code{n_gap_max},
+and \code{require_endpoints} constraints from \code{\link[=set_weasel_scope]{set_weasel_scope()}} are
+applied. Duplicated (id, wave) rows are counted once and trigger a
+warning.
 }
 \examples{
 d <- generate_weasel_dummy_data(n_ids = 50, n_times = 8, seed = 1)

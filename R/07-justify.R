@@ -74,7 +74,13 @@ weasel_justify_subset <- function(plan_obj,
   require_endpoints <- as.logical(get1(row$require_endpoints))
   max_missing       <- as.integer(get1(row$max_missing))
   n_gap_max         <- as.integer(get1(row$n_gap_max))
-  max_gap_max       <- as.integer(get1(row$max_gap_max))
+  # plans saved before 0.4.0 store this column as max_gap_max
+  gl_col      <- if (!is.null(row[["max_gap_len"]])) {
+    row[["max_gap_len"]]
+  } else {
+    row[["max_gap_max"]]
+  }
+  max_gap_len <- as.integer(get1(gl_col))
   mean_prop_present <- suppressWarnings(as.numeric(get1(row$mean_prop_present)))
   endpoint_rate     <- suppressWarnings(as.numeric(get1(row$endpoint_rate)))
   span_reason <- if ("span_reason" %in% names(row)) {
@@ -131,10 +137,10 @@ weasel_justify_subset <- function(plan_obj,
   }
 
   gap_txt <- NULL
-  if (!is.na(n_gap_max) && !is.na(max_gap_max)) {
+  if (!is.na(n_gap_max) && !is.na(max_gap_len)) {
     gap_txt <- sprintf(
       "and restricted the missingness structure (at most %s interior missing block(s), each no longer than %s wave(s))",
-      n_gap_max, max_gap_max
+      n_gap_max, max_gap_len
     )
   }
 

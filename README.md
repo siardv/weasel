@@ -40,7 +40,7 @@ weasel_print_table(weasel_sensitivity(p, max_missing = 0:2), n = 10)
 weasel_print_table(weasel_selectivity(p, "anchored_balanced"))
 
 # interactive pattern exploration
-set_weasel_scope(d, "id", "time", gap = 1)
+set_weasel_scope(d, "id", "time", max_gap_len = 1)
 evaluate_weasel_scope()
 weasel_reshape_to_wide()
 weasel_summarize_waves()

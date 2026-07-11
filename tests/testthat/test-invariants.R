@@ -38,7 +38,7 @@ test_that("scenario id lists agree exactly with the stored metrics", {
 
     qual <- m$n_missing <= row$max_missing &
       m$n_gap <= row$n_gap_max &
-      m$max_gap <= row$max_gap_max
+      m$max_gap <= row$max_gap_len
     if (isTRUE(row$require_endpoints)) {
       qual <- qual & m$has_lower & m$has_upper
     }
@@ -74,7 +74,7 @@ test_that("plan results are invariant to input row order", {
 
 test_that("pattern counts and pattern strings add up", {
   d <- random_panel(51)
-  set_weasel_scope(d, "id", "time", size = 1)
+  set_weasel_scope(d, "id", "time", min_present = 1)
   on.exit(weasel_clear_scope(), add = TRUE)
   pv <- suppressMessages(weasel_reshape_to_wide())
   v <- weasel_summarize_waves()
@@ -92,11 +92,11 @@ test_that("weasel_sensitivity matches brute-force filtering of id_metrics", {
   m <- p$id_metrics
   s <- weasel_sensitivity(p, require_endpoints = c(TRUE, FALSE),
                           max_missing = 0:2, n_gap_max = 0:1,
-                          max_gap_max = 0:2)
+                          max_gap_len = 0:2)
   for (i in seq_len(nrow(s))) {
     keep <- m$n_missing <= s$max_missing[i] &
       m$n_gap <= s$n_gap_max[i] &
-      m$max_gap <= s$max_gap_max[i]
+      m$max_gap <= s$max_gap_len[i]
     if (s$require_endpoints[i]) keep <- keep & m$has_lower & m$has_upper
     expect_identical(s$n_ids[i], as.integer(sum(keep)))
     if (any(keep)) {
