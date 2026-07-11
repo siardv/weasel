@@ -1,3 +1,32 @@
+# weasel (development version)
+
+Stage 1 of the 0.4.0 cycle: release safety and documentation accuracy.
+No changes to computational behaviour.
+
+* Guide (documentation site): corrected two descriptions that
+  contradicted the implementation. The `gap`/`n_gap` scope constraints
+  were described as inert; they filter respondents at
+  `weasel_reshape_to_wide()` (and are covered by tests). The
+  synthetic-data walkthroughs described a pre-0.3 complete-grid,
+  item-NA data model and presented a "focal outcome" filtering step as
+  required; `generate_weasel_dummy_data()` produces row-absence
+  missingness directly, so that step is now described only as an
+  optional way to key observation to outcome availability. Also fixed:
+  the pattern-table `n` column description (observed waves per pattern,
+  not window length), the missing `sensitivity` element in the
+  `weasel_example()` return listing, and the footer installation
+  command (the package installs from GitHub, not CRAN). All guide
+  code snippets now start with `library(weasel)`, so each one runs
+  as pasted in a fresh session.
+* `.Rbuildignore` and `.gitignore` now exclude the local `v3/` staging
+  folder and `update_github_repo.sh`, so tarballs built from a local
+  working copy match CI builds, no development artifacts ship, and an
+  accidental `git add -A` cannot publish internal drafts.
+* Added `inst/CITATION` so `citation("weasel")` agrees with
+  `CITATION.cff`; the version is read from `DESCRIPTION` at build time.
+* The version-coherence workflow now also checks the `CITATION.cff`
+  version against `DESCRIPTION`.
+
 # weasel 0.3.1
 
 Coherence and reproducibility release. No behavioural changes for
