@@ -49,7 +49,9 @@ Produces a plain-text paragraph that researchers can paste into a
 methods section to explain and justify their subset selection. The
 text references the structural constraints (endpoints, interior
 gaps, span length), frames the choice as a coverage-vs-sample-size
-trade-off, and optionally cites the package.
+trade-off, and optionally cites the package. A scenario that retains
+no respondents cannot be justified and raises a classed error
+(\code{weasel_error_empty_scenario}).
 }
 \examples{
 d <- generate_weasel_dummy_data(n_ids = 200, n_times = 10, seed = 1)

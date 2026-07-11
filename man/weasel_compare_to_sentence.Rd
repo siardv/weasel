@@ -17,7 +17,9 @@ A single character string.
 \description{
 Produces a human-readable sentence from the scored scenario table,
 suitable for reports or console output. Intended to be called right
-after \code{\link[=weasel_compare_scenarios]{weasel_compare_scenarios()}}.
+after \code{\link[=weasel_compare_scenarios]{weasel_compare_scenarios()}}. When no scenario is recommended
+(for example because every scenario retains zero respondents), the
+sentence says so instead of naming one.
 }
 \examples{
 d <- generate_weasel_dummy_data(n_ids = 100, n_times = 10, seed = 1)

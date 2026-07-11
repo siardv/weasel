@@ -77,10 +77,14 @@ set_weasel_scope <- function(data,
   gap   <- .weasel_check_count(gap, "gap")
   n_gap <- .weasel_check_count(n_gap, "n_gap")
   if (!is.null(size)) {
-    size <- suppressWarnings(as.integer(size))
-    if (length(size) == 0 || anyNA(size) || any(size < 1)) {
-      .weasel_stop("size must be a vector of positive integers.")
+    ok <- is.numeric(size) && length(size) > 0 && !anyNA(size) &&
+      all(is.finite(size)) && all(abs(size - round(size)) <= 1e-8) &&
+      all(size >= 1)
+    if (!ok) {
+      .weasel_stop("size must be a vector of positive integers ",
+                   "(fractional values are rejected, not truncated).")
     }
+    size <- as.integer(round(size))
   }
 
   if (!is.null(the$scope) && !isTRUE(override)) {
@@ -283,6 +287,8 @@ weasel_reshape_to_wide <- function() {
   wave_col <- env$wave
   span     <- env$span
   L        <- length(span)
+
+  .weasel_report_dropped(dat, id_col, wave_col, span)
 
   ok    <- !is.na(dat[[id_col]]) & !is.na(dat[[wave_col]])
   ids0  <- dat[[id_col]][ok]

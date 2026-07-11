@@ -94,7 +94,9 @@
 #'
 #' Used internally by [weasel_apply()] and [weasel_summarize_subset()],
 #' but also useful when building custom workflows. Accepts either an
-#' exact name or an unambiguous substring.
+#' exact name or an unambiguous prefix; arbitrary substrings are not
+#' matched, so an abbreviation always selects the scenario it visibly
+#' starts.
 #'
 #' @param scenario Character string to look up.
 #' @param choices Character vector of valid scenario names.
@@ -105,7 +107,7 @@
 #' choices <- c("anchored_strict", "anchored_balanced", "lenient_info_max")
 #'
 #' weasel_match_scenario("anchored_strict", choices)
-#' weasel_match_scenario("lenient", choices)
+#' weasel_match_scenario("lenient", choices)  # unique prefix
 #'
 #' # ambiguous substring errors: "anchored" matches two scenarios
 #' try(weasel_match_scenario("anchored", choices))
@@ -115,11 +117,12 @@ weasel_match_scenario <- function(scenario, choices) {
   scenario <- as.character(scenario)[1]
   choices  <- as.character(choices)
   if (scenario %in% choices) return(scenario)
-  hits <- choices[grepl(scenario, choices, fixed = TRUE)]
+  hits <- choices[startsWith(choices, scenario)]
   if (length(hits) == 1) return(hits)
   .weasel_stop(
     "scenario not found or ambiguous: '", scenario,
-    "'. Available: ", paste(choices, collapse = ", "),
+    "' (use an exact name or a unique prefix). Available: ",
+    paste(choices, collapse = ", "),
     class = "weasel_error_scenario"
   )
 }
@@ -206,7 +209,9 @@ weasel_compare_scenarios <- function(plan_obj, weights = NULL) {
 #'
 #' Produces a human-readable sentence from the scored scenario table,
 #' suitable for reports or console output. Intended to be called right
-#' after [weasel_compare_scenarios()].
+#' after [weasel_compare_scenarios()]. When no scenario is recommended
+#' (for example because every scenario retains zero respondents), the
+#' sentence says so instead of naming one.
 #'
 #' @param cmp Data frame returned by [weasel_compare_scenarios()].
 #' @param digits Number of decimal places.
@@ -228,11 +233,18 @@ weasel_compare_to_sentence <- function(cmp, digits = 3) {
     .weasel_stop("cmp is missing required columns.")
   }
 
-  rec_i <- which(cmp$recommended)[1]
-  if (is.na(rec_i) || length(rec_i) == 0) rec_i <- 1L
-  rec <- cmp[rec_i, , drop = FALSE]
-
-  lines <- paste0("Recommended scenario: ", dQuote(rec$scenario, FALSE), ".")
+  rec_i <- which(cmp$recommended)
+  lines <- if (length(rec_i) == 0) {
+    # never fabricate a recommendation: say plainly that none exists
+    if (all(cmp$n_ids == 0)) {
+      "No scenario is recommended: every scenario retains zero respondents."
+    } else {
+      "No scenario is marked as recommended."
+    }
+  } else {
+    rec <- cmp[rec_i[1], , drop = FALSE]
+    paste0("Recommended scenario: ", dQuote(rec$scenario, FALSE), ".")
+  }
   for (i in seq_len(nrow(cmp))) {
     r <- cmp[i, , drop = FALSE]
     lines <- c(lines, sprintf(
@@ -320,6 +332,7 @@ weasel_plan <- function(data,
   .weasel_check_id_wave(data, id, wave)
   span <- match.arg(span)
   grid <- match.arg(grid)
+  core_len <- .weasel_or(.weasel_check_count(core_len, "core_len"), 6L)
   .weasel_check_duplicates(
     data[!is.na(data[[id]]) & !is.na(data[[wave]]), c(id, wave), drop = FALSE],
     id, wave
@@ -327,13 +340,15 @@ weasel_plan <- function(data,
 
   span_pick <- .weasel_choose_span(data, id, wave,
                                    span = span,
-                                   min_len = as.integer(core_len),
+                                   min_len = core_len,
                                    grid = grid)
   lower       <- span_pick$lower
   upper       <- span_pick$upper
   span_vec    <- span_pick$span
   span_reason <- span_pick$reason
   L           <- length(span_vec)
+
+  .weasel_report_dropped(data, id, wave, span_vec)
 
   idm <- .weasel_id_metrics(data, id, wave, span_vec)
   if (nrow(idm) == 0) .weasel_stop("no usable ids found in the chosen span.")
@@ -475,7 +490,10 @@ print.weasel_plan <- function(x, digits = 3, ...) {
 #' Subsets the original data to the respondents and wave range selected
 #' by a given scenario. This is typically the final step: after
 #' reviewing [weasel_compare_scenarios()], pick a scenario and call this
-#' to get the analysis-ready data frame.
+#' to get the analysis-ready data frame. Selection metrics count each
+#' (id, wave) pair once, but output rows are returned as they appear in
+#' the data; if duplicated pairs remain in the result, a classed warning
+#' (`weasel_duplicates`) reminds you to resolve them before modelling.
 #'
 #' @param plan_obj Object returned by [weasel_plan()].
 #' @param scenario Name (or unambiguous abbreviation) of the scenario.
@@ -492,8 +510,8 @@ print.weasel_plan <- function(x, digits = 3, ...) {
 #' balanced <- weasel_apply(p, "anchored_balanced")
 #' dim(balanced)
 #'
-#' # abbreviations work when unambiguous
-#' strict <- weasel_apply(p, "strict")
+#' # unambiguous prefixes work
+#' strict <- weasel_apply(p, "anchored_s")
 #' dim(strict)
 #'
 #' # plans built with keep_data = FALSE need the data passed back in
@@ -524,7 +542,9 @@ weasel_apply <- function(plan_obj, scenario, data = NULL) {
   sp    <- .weasel_plan_span(plan_obj, row)
   w_int <- as.integer(round(data[[wave_col]]))
 
-  data[data[[id_col]] %in% ids_keep & (w_int %in% sp), , drop = FALSE]
+  out <- data[data[[id_col]] %in% ids_keep & (w_int %in% sp), , drop = FALSE]
+  .weasel_warn_output_duplicates(out, id_col, wave_col)
+  out
 }
 
 #' Summarize a chosen scenario subset
@@ -533,7 +553,10 @@ weasel_apply <- function(plan_obj, scenario, data = NULL) {
 #' distribution for a specific scenario. Use this to audit a scenario
 #' before committing to [weasel_apply()]. By default the data and
 #' column names stored in the plan object are reused; supply `data`,
-#' `id`, or `wave` only to override them.
+#' `id`, or `wave` only to override them. `headline$n_rows` counts
+#' physical rows; when duplicated (id, wave) rows are present it
+#' therefore exceeds the deduplicated pair count, and a classed warning
+#' (`weasel_duplicates`) is emitted.
 #'
 #' @param plan_obj Object returned by [weasel_plan()].
 #' @param scenario Name of the scenario to summarize.
@@ -584,11 +607,13 @@ weasel_summarize_subset <- function(plan_obj, scenario, data = NULL,
   sp       <- .weasel_plan_span(plan_obj, row)
   L        <- length(sp)
   if (length(ids_keep) == 0) {
-    .weasel_stop("scenario '", scenario, "' retains no respondents.")
+    .weasel_stop("scenario '", scenario, "' retains no respondents.",
+                 class = "weasel_error_empty_scenario")
   }
 
   w_all  <- as.integer(round(data[[wave]]))
   subdat <- data[data[[id]] %in% ids_keep & (w_all %in% sp), , drop = FALSE]
+  .weasel_warn_output_duplicates(subdat, id, wave)
 
   id_wave <- subdat[c(id, wave)]
   id_wave[[wave]] <- as.integer(round(id_wave[[wave]]))

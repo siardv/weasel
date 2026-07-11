@@ -68,22 +68,30 @@ the <- new.env(parent = emptyenv())
 
 .weasel_unique_int <- function(x) sort(unique(as.integer(x[!is.na(x)])))
 
-# single non-negative integer or NULL
+# single non-negative integer or NULL; strict: fractional values are
+# rejected rather than silently truncated
 .weasel_check_count <- function(x, name) {
   if (is.null(x)) return(NULL)
-  x <- suppressWarnings(as.integer(x[1]))
-  if (is.na(x) || x < 0) {
-    .weasel_stop(name, " must be a single non-negative integer.")
+  ok <- length(x) == 1 && is.numeric(x) && !is.na(x) && is.finite(x) &&
+    abs(x - round(x)) <= 1e-8 && x >= 0
+  if (!ok) {
+    .weasel_stop(name, " must be a single non-negative integer ",
+                 "(fractional values are rejected, not truncated).")
   }
-  x
+  as.integer(round(x))
 }
 
-# single integer bound (any sign) or NULL
+# single integer bound (any sign) or NULL; strict: fractional values
+# are rejected rather than silently rounded
 .weasel_check_bound <- function(x, name) {
   if (is.null(x)) return(NULL)
-  x <- suppressWarnings(as.integer(round(as.numeric(x[1]))))
-  if (is.na(x)) .weasel_stop(name, " must be a single number.")
-  x
+  ok <- length(x) == 1 && is.numeric(x) && !is.na(x) && is.finite(x) &&
+    abs(x - round(x)) <= 1e-8
+  if (!ok) {
+    .weasel_stop(name, " must be a single integer-valued number ",
+                 "(fractional values are rejected, not rounded).")
+  }
+  as.integer(round(x))
 }
 
 # validate a wave column: must be numeric and integer-valued
@@ -111,10 +119,51 @@ the <- new.env(parent = emptyenv())
   if (!is.data.frame(data)) .weasel_stop("data must be a data.frame.")
   if (!is.character(id) || length(id) != 1) .weasel_stop("id must be a single string.")
   if (!is.character(wave) || length(wave) != 1) .weasel_stop("wave must be a single string.")
+  if (identical(id, wave)) {
+    .weasel_stop("id and wave must be different columns (both are '",
+                 id, "').")
+  }
   if (!(id %in% names(data))) .weasel_stop("id column not found: ", id)
   if (!(wave %in% names(data))) .weasel_stop("wave column not found: ", wave)
   if (is.list(data[[id]])) .weasel_stop("id column must be an atomic vector.")
   invisible(.weasel_check_wave(data[[wave]], wave))
+}
+
+# one-line account of rows excluded from participation analysis, so no
+# observation disappears silently; verbose-gated like all status text
+.weasel_report_dropped <- function(data, id, wave, span) {
+  na_id   <- sum(is.na(data[[id]]))
+  na_wave <- sum(!is.na(data[[id]]) & is.na(data[[wave]]))
+  w <- suppressWarnings(as.integer(round(as.numeric(data[[wave]]))))
+  out_span <- sum(!is.na(data[[id]]) & !is.na(w) & !(w %in% span))
+  if (na_id + na_wave + out_span > 0) {
+    .weasel_msg(
+      "rows not used for participation: ", na_id, " with missing ", id,
+      ", ", na_wave, " with missing ", wave, ", ", out_span,
+      " outside span ", span[1], ":", span[length(span)], "."
+    )
+  }
+  invisible(c(na_id = na_id, na_wave = na_wave, out_of_span = out_span))
+}
+
+# warn when a returned long-format subset still contains duplicated
+# (id, wave) rows: participation metrics count each pair once, but
+# output rows are returned as-is
+.weasel_warn_output_duplicates <- function(out, id, wave) {
+  if (nrow(out) == 0) return(invisible(0L))
+  dd <- .weasel_dedup_index(out[[id]],
+                            as.integer(round(as.numeric(out[[wave]]))))
+  if (dd$n_dup > 0) {
+    .weasel_warn(
+      dd$n_dup, " duplicated (", id, ", ", wave, ") row(s) in the ",
+      "returned data. selection metrics counted each pair once, but ",
+      "output rows are not deduplicated; resolve duplicates before ",
+      "modelling, e.g. df[!duplicated(df[c(\"", id, "\", \"", wave,
+      "\")]), ].",
+      class = "weasel_duplicates"
+    )
+  }
+  invisible(dd$n_dup)
 }
 
 # sorted index of the unique (id, wave) pairs plus the duplicate count;
@@ -209,6 +258,12 @@ the <- new.env(parent = emptyenv())
       .weasel_stop("scenario column '", nm, "' must not contain NA.")
     }
     if (any(s[[nm]] < 0)) .weasel_stop("scenario column '", nm, "' must be >= 0.")
+    frac <- is.finite(s[[nm]]) & abs(s[[nm]] - round(s[[nm]])) > 1e-8
+    if (any(frac)) {
+      .weasel_stop("scenario column '", nm, "' must contain integer-valued ",
+                   "tolerances or Inf (fractional values are rejected, ",
+                   "not truncated).")
+    }
   }
   s
 }

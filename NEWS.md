@@ -55,6 +55,49 @@ Additive, plus one bug the new scaffolding exposed immediately.
   installed package on each push, so guide examples can no longer
   drift from the implementation without failing CI.
 
+Stage 3 of the 0.4.0 cycle: dirty-input and degenerate-case
+correctness. Behaviour changes affect malformed input and degenerate
+cases only; results on clean panels are unchanged (and guarded by the
+stage 2 invariant and equivalence suites).
+
+* `weasel_compare_to_sentence()` no longer fabricates a
+  recommendation when no scenario is recommendable (previously it fell
+  back to the first row and reported it as recommended); it now states
+  plainly that no scenario is recommended.
+* `weasel_selectivity()` now deduplicates (id, wave) pairs: covariate
+  values are averaged within each duplicated pair, a classed warning
+  (`weasel_duplicates`) is emitted, and the diagnostic no longer
+  depends on the row order of the input. Previously, with duplicated
+  rows, `at = "first"` silently used whichever duplicate appeared
+  first and `at = "mean"` double-counted duplicated waves.
+* `weasel_apply()` and `weasel_summarize_subset()` emit a classed
+  warning (`weasel_duplicates`) when the returned data still contain
+  duplicated (id, wave) rows, and their documentation now spells out
+  the contract: selection metrics count each pair once, output rows
+  are returned as-is (participation deduplication is not output-row
+  deduplication).
+* `id` and `wave` must now name different columns; previously
+  `weasel_plan(d, "time", "time")` was accepted and silently retained
+  nobody.
+* Rows excluded from participation analysis (missing id, missing
+  wave, outside the span) are now counted in a verbose-mode message in
+  both pipelines instead of disappearing silently.
+* `weasel_justify_subset()` refuses to write a justification for a
+  scenario that retains no respondents (classed error
+  `weasel_error_empty_scenario`, also added to the corresponding
+  errors in `weasel_summarize_subset()`).
+* Scenario matching now accepts an exact name or an unambiguous
+  prefix; arbitrary substrings (for example `"strict"` for
+  `anchored_strict`, or `"ed_ba"`) no longer match.
+* Strict integer validation everywhere a whole number is expected:
+  `gap`, `n_gap`, `size`, `lower`, `upper`, `core_len`, sensitivity
+  tolerances, scenario-table tolerance columns (`Inf` still means "no
+  constraint"), `digits`/`n` in `weasel_print_table()`, and the
+  generator's count and `waves` arguments. Fractional values are
+  rejected with a clear error instead of being silently truncated
+  (previously `gap = 1.9` acted as `gap = 1`) or rounded (previously
+  `lower = 2.6` acted as `lower = 3`).
+
 # weasel 0.3.1
 
 Coherence and reproducibility release. No behavioural changes for

@@ -47,7 +47,10 @@ For every respondent, a single value per covariate is taken either
 from their first observed wave inside the span (\code{at = "first"}, the
 usual baseline comparison) or as the mean over their observed waves
 in the span (\code{at = "mean"}). Missing item values are dropped within
-each group. The SMD divides the group difference by the pooled
+each group. Duplicated (id, wave) rows trigger a classed warning
+(\code{weasel_duplicates}) and their covariate values are averaged within
+each pair first, so the diagnostic counts each pair once and does
+not depend on the row order of the input. The SMD divides the group difference by the pooled
 standard deviation \code{sqrt((sd_retained^2 + sd_excluded^2) / 2)};
 absolute values around 0.1 or larger are commonly read as noteworthy
 imbalance. The SMD is \code{NA} when either group has no spread.

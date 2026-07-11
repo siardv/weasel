@@ -88,8 +88,21 @@ generate_weasel_dummy_data <- function(n_ids = 1000,
                                        id_start = 800001,
                                        waves = NULL,
                                        seed = NULL) {
+  n_ids    <- .weasel_check_count(n_ids, "n_ids")
+  n_times  <- .weasel_check_count(n_times, "n_times")
+  n_vars   <- .weasel_check_count(n_vars, "n_vars")
+  id_start <- .weasel_check_bound(id_start, "id_start")
+  if (is.null(n_ids) || is.null(n_times) || is.null(n_vars) ||
+      is.null(id_start)) {
+    .weasel_stop("n_ids, n_times, n_vars, and id_start must not be NULL.")
+  }
   if (!is.null(waves)) {
-    waves <- .weasel_unique_int(waves)
+    if (!is.numeric(waves) || length(waves) == 0 || anyNA(waves) ||
+        any(!is.finite(waves)) || any(abs(waves - round(waves)) > 1e-8)) {
+      .weasel_stop("waves must be integer-valued wave labels ",
+                   "(fractional values are rejected, not truncated).")
+    }
+    waves <- sort(unique(as.integer(round(waves))))
     if (length(waves) <= 2) {
       .weasel_stop("waves must contain more than 2 distinct integer values.")
     }
@@ -98,7 +111,10 @@ generate_weasel_dummy_data <- function(n_ids = 1000,
   if (n_ids <= 0) .weasel_stop("n_ids must be > 0.")
   if (n_times <= 2) .weasel_stop("n_times must be > 2.")
   if (n_vars <= 0) .weasel_stop("n_vars must be > 0.")
-  if (length(block_duration_range) != 2 || any(block_duration_range < 1)) {
+  if (length(block_duration_range) != 2 ||
+      !is.numeric(block_duration_range) || anyNA(block_duration_range) ||
+      any(abs(block_duration_range - round(block_duration_range)) > 1e-8) ||
+      any(block_duration_range < 1)) {
     .weasel_stop("block_duration_range must be two integers >= 1.")
   }
 
