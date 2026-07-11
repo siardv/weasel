@@ -23,7 +23,9 @@ columns.}
 
 \item{data}{Optional long-format data frame; defaults to the data
 attached to \code{plan_obj}. Required when the plan was created with
-\code{keep_data = FALSE}.}
+\code{keep_data = FALSE}. Explicitly supplied data are checked against
+the plan's structural fingerprint (classed warning
+\code{weasel_data_mismatch} on mismatch).}
 
 \item{at}{Either \code{"first"} (value at the first observed wave in the
 span) or \code{"mean"} (mean over observed waves in the span).}

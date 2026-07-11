@@ -98,6 +98,47 @@ stage 2 invariant and equivalence suites).
   (previously `gap = 1.9` acted as `gap = 1`) or rounded (previously
   `lower = 2.6` acted as `lower = 3`).
 
+Stage 4 of the 0.4.0 cycle: additive transparency and self-protection
+for plans. All changes are additive; results on clean panels with
+default arguments are unchanged.
+
+* `weasel_plan()` gains explicit `lower`/`upper` bounds: the window is
+  then fixed a priori (`span_reason = "explicit"`), and the generated
+  justification text reports it as a design decision instead of
+  attributing it to an automatic span rule. Supplying both `span` and
+  bounds is an error.
+* Core-window selection is now inspectable: every candidate window and
+  its coverage is stored in `plan$span_candidates`, the objective
+  (total deduplicated respondent-wave coverage, earliest window on
+  ties) is documented, and exact coverage ties trigger a classed
+  warning (`weasel_tied_windows`) instead of a silent `which.max()`.
+* `weasel_compare_scenarios()` gains `tie_tolerance` and a `near_tie`
+  column flagging scenarios the score cannot meaningfully separate;
+  the active weights and the per-scenario score decomposition are
+  attached as attributes (`"weights"`, `"score_components"`); the
+  documentation now states plainly that the score is a
+  comparison-relative heuristic (the size term is normalised within
+  the supplied scenario set) and that endpoint-requiring scenarios
+  earn the endpoint term by construction. The recommendation sentence
+  is now conditional ("highest composite score under the declared
+  weights") and notes when the recommendation is not unique.
+* Plans now record their planning population: rows and distinct ids in
+  the supplied data versus ids and unique pairs observed in the span.
+  The denominator (`observed_in_span`) is printed, documented, and
+  stated in the generated justification text, so retention figures can
+  no longer be mistaken for proportions of the full panel.
+* Plans now store a structural fingerprint of the data they were built
+  from; `weasel_apply()`, `weasel_summarize_subset()`, and
+  `weasel_selectivity()` compare explicitly supplied data against it
+  and emit a classed warning (`weasel_data_mismatch`) when the data do
+  not match, closing a silent-reunion hazard for plans saved with
+  `keep_data = FALSE`.
+* The wave-pattern summary gains a stable `pattern` id column that
+  survives filtering, and `weasel_get_data_by_row()` accepts pattern
+  ids or pattern strings. Previously the printed, filtered table gave
+  no way to see the original row numbers, so extraction after
+  filtering could silently target the wrong pattern.
+
 # weasel 0.3.1
 
 Coherence and reproducibility release. No behavioural changes for

@@ -12,7 +12,9 @@ weasel_plan(
   core_len = 6L,
   scenarios = NULL,
   grid = c("consecutive", "observed"),
-  keep_data = TRUE
+  keep_data = TRUE,
+  lower = NULL,
+  upper = NULL
 )
 }
 \arguments{
@@ -26,8 +28,13 @@ is supported.}
 \item{wave}{Name of the wave/time column. Must be numeric with
 integer-valued entries.}
 
-\item{span}{Either \code{"core"} (highest-coverage window of \code{core_len}
-consecutive grid waves) or \code{"full"} (all waves).}
+\item{span}{Either \code{"core"} (window of \code{core_len} consecutive grid
+waves with the highest total respondent-wave coverage; exact
+coverage ties are resolved in favour of the earliest window with a
+classed warning, \code{weasel_tied_windows}, and every candidate window
+is stored in the returned \code{span_candidates} table) or \code{"full"}
+(all waves). Ignored when explicit \code{lower}/\code{upper} bounds are
+supplied; supplying both raises an error.}
 
 \item{core_len}{Integer; desired window length when \code{span = "core"}.}
 
@@ -51,14 +58,28 @@ to the returned object so that \code{\link[=weasel_apply]{weasel_apply()}},
 it. Set to \code{FALSE} to keep the plan object small (for example
 before saving it with \code{saveRDS()}); those functions then need the
 data passed back in through their \code{data} argument.}
+
+\item{lower, upper}{Optional explicit integer window bounds. When
+either is supplied the analysis window is fixed a priori
+(\code{span_reason = "explicit"}), which the justification text reports
+as a design decision rather than an automatic selection. Bounds
+are interpreted on the chosen \code{grid}; the effective bounds are the
+first and last grid waves inside the requested range.}
 }
 \value{
 A list of class \code{weasel_plan} with elements \code{plan} (scored
 scenario table), \code{id_metrics}, \code{lower}, \code{upper}, \code{span} (integer
-vector of grid waves), \code{grid}, \code{span_reason}, \code{id}, and \code{wave}.
-When \code{keep_data = TRUE} the original \code{data} is attached as an
-attribute. Printing the object shows a compact summary instead of
-the raw list.
+vector of grid waves), \code{grid}, \code{span_reason} (\code{"core"}, \code{"full"},
+or \code{"explicit"}), \code{span_candidates} (for core spans, every
+candidate window with its coverage and a \code{chosen} flag; \code{NULL}
+otherwise), \code{population} (the planning denominator: rows and
+distinct ids in the data, ids and unique pairs observed in the
+span; all retention proportions are relative to
+\code{"observed_in_span"}), \code{fingerprint} (a structural fingerprint of
+the data used to detect mismatched reunions later), \code{id}, and
+\code{wave}. When \code{keep_data = TRUE} the original \code{data} is attached as
+an attribute. Printing the object shows a compact summary instead
+of the raw list.
 }
 \description{
 Evaluates three default scenarios (\code{anchored_strict},
@@ -84,5 +105,9 @@ dim(sub)
 b <- generate_weasel_dummy_data(n_ids = 60, waves = seq(2008, 2020, 2),
                                 seed = 1)
 pb <- weasel_plan(b, "id", "time", span = "full", grid = "observed")
+
+# a design-determined window: fix the bounds a priori
+pe <- weasel_plan(d, "id", "time", lower = 3, upper = 8)
+pe$span_reason
 
 }

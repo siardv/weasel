@@ -369,6 +369,48 @@ the <- new.env(parent = emptyenv())
   invisible(plan_obj)
 }
 
+# structural fingerprint of a panel, cheap and order-invariant; used to
+# detect when a saved plan is reunited with data it was not built from
+.weasel_data_fingerprint <- function(data, id, wave) {
+  ok   <- !is.na(data[[id]]) & !is.na(data[[wave]])
+  ids0 <- data[[id]][ok]
+  w0   <- as.integer(round(as.numeric(data[[wave]][ok])))
+  dd   <- .weasel_dedup_index(ids0, w0)
+  idsu <- ids0[dd$idx]
+  wu   <- w0[dd$idx]
+  waves <- sort(unique(wu))
+  list(
+    n_rows         = nrow(data),
+    n_pairs        = length(wu),
+    n_ids          = length(unique(idsu)),
+    id_type        = class(data[[id]])[1],
+    waves          = waves,
+    pairs_per_wave = as.integer(table(factor(wu, levels = waves)))
+  )
+}
+
+# compare the stored fingerprint against explicitly supplied data and
+# warn on a structural mismatch; plans from older versions carry no
+# fingerprint and are accepted silently
+.weasel_check_fingerprint <- function(plan_obj, data, id, wave) {
+  fp <- plan_obj[["fingerprint"]]
+  if (is.null(fp)) return(invisible(TRUE))
+  now <- .weasel_data_fingerprint(data, id, wave)
+  same <- identical(fp, now)
+  if (!same) {
+    .weasel_warn(
+      "the supplied data do not structurally match the data this plan ",
+      "was built from (rows ", fp$n_rows, " -> ", now$n_rows,
+      ", unique (id, wave) pairs ", fp$n_pairs, " -> ", now$n_pairs,
+      ", distinct ids ", fp$n_ids, " -> ", now$n_ids, "). the plan's ",
+      "scenario id lists were computed on the original data; results ",
+      "on different data may be invalid.",
+      class = "weasel_data_mismatch"
+    )
+  }
+  invisible(same)
+}
+
 # grid waves of a plan, with a fallback for objects saved by older
 # versions that only stored the bounds; exact [[ ]] indexing is
 # essential here: with $, a missing 'span' partial-matches

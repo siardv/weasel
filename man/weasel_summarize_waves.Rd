@@ -12,10 +12,13 @@ The summary data frame, invisibly.
 \description{
 Groups respondents by their observed-wave pattern and counts how many
 share each pattern. Requires \code{\link[=weasel_reshape_to_wide]{weasel_reshape_to_wide()}} to have been
-called. In the result, \code{waves} is the pattern (a \code{.} marks a missing
-wave), \code{n} is the number of observed waves in that pattern, and \code{ids}
-is the number of respondents sharing it. Rows are sorted by \code{ids},
-then \code{n}, both descending.
+called. In the result, \code{pattern} is a stable pattern id (the row
+number of the full summary; filtering with
+\code{\link[=weasel_filter_wave_summary]{weasel_filter_wave_summary()}} keeps it, so it can always be passed
+to \code{\link[=weasel_get_data_by_row]{weasel_get_data_by_row()}}), \code{waves} is the pattern (a \code{.} marks a
+missing wave), \code{n} is the number of observed waves in that pattern,
+and \code{ids} is the number of respondents sharing it. Rows are sorted by
+\code{ids}, then \code{n}, both descending.
 }
 \examples{
 d <- generate_weasel_dummy_data(n_ids = 50, n_times = 8, seed = 1)

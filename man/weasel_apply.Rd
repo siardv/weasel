@@ -13,7 +13,10 @@ weasel_apply(plan_obj, scenario, data = NULL)
 
 \item{data}{Optional long-format data frame; defaults to the data
 attached to \code{plan_obj}. Required when the plan was created with
-\code{keep_data = FALSE}.}
+\code{keep_data = FALSE}. Explicitly supplied data are compared with
+the plan's structural fingerprint; a mismatch triggers a classed
+warning (\code{weasel_data_mismatch}), since the plan's id lists were
+computed on the original data.}
 }
 \value{
 A data frame.

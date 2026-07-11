@@ -7,9 +7,11 @@
 weasel_get_data_by_row(i = 1L, within_span = FALSE)
 }
 \arguments{
-\item{i}{Integer vector of row indices into the wave-pattern summary;
-respondents matching any of the selected patterns are returned.
-Defaults to the first row.}
+\item{i}{Pattern selector: an integer vector of pattern ids (the
+\code{pattern} column of the summary, which equals the row numbers of
+the full, unfiltered table), or a character vector of pattern
+strings (\code{waves} values). Respondents matching any selected
+pattern are returned. Defaults to the first pattern.}
 
 \item{within_span}{If \code{TRUE}, only rows whose wave lies inside the
 scoped span are returned. If \code{FALSE} (default), all rows of the
@@ -23,8 +25,8 @@ A data frame (subset of the original long data).
 After \code{\link[=weasel_summarize_waves]{weasel_summarize_waves()}} has grouped respondents into
 patterns, this function extracts the long-format rows for every
 respondent who matches the given pattern row(s). Use
-\code{\link[=weasel_filter_wave_summary]{weasel_filter_wave_summary()}} first to identify which row indices to
-request.
+\code{\link[=weasel_filter_wave_summary]{weasel_filter_wave_summary()}} first to identify which patterns to
+request; the \code{pattern} ids it shows remain valid selectors here.
 }
 \examples{
 d <- generate_weasel_dummy_data(n_ids = 50, n_times = 8, seed = 1)

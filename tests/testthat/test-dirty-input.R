@@ -127,7 +127,8 @@ test_that("fractional constraint values are rejected, never truncated", {
 
   sc <- data.frame(scenario = "s", require_endpoints = FALSE,
                    max_missing = 1.5, n_gap_max = 8, max_gap_max = 8)
-  expect_error(weasel_plan(d, "id", "time", scenarios = sc), "fractional")
+  expect_error(weasel_plan(d, "id", "time", span = "full", scenarios = sc),
+               "fractional")
 
   # Inf remains a valid "no constraint" tolerance in scenario tables
   sc_inf <- data.frame(scenario = "s", require_endpoints = FALSE,

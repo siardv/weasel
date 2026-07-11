@@ -27,7 +27,7 @@ choices <- c("anchored_strict", "anchored_balanced", "lenient_info_max")
 weasel_match_scenario("anchored_strict", choices)
 weasel_match_scenario("lenient", choices)  # unique prefix
 
-# ambiguous prefix errors: "anchored" matches two scenarios
+# ambiguous prefix errors: "anchored" starts two scenarios
 try(weasel_match_scenario("anchored", choices))
 
 }

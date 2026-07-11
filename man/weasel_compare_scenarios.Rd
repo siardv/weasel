@@ -4,7 +4,7 @@
 \alias{weasel_compare_scenarios}
 \title{Score and rank scenarios from a weasel plan}
 \usage{
-weasel_compare_scenarios(plan_obj, weights = NULL)
+weasel_compare_scenarios(plan_obj, weights = NULL, tie_tolerance = 0.01)
 }
 \arguments{
 \item{plan_obj}{A list with element \code{plan} (data frame of scenarios),
@@ -12,10 +12,16 @@ as returned by \code{\link[=weasel_plan]{weasel_plan()}}.}
 
 \item{weights}{Named numeric vector overriding any of the default
 weights \code{c(coverage = 2, endpoints = 1.2, size = 0.8, missing = 0.6, gaps = 0.4)}. \code{NA} values are rejected.}
+
+\item{tie_tolerance}{Single non-negative number; scenarios whose
+scores are within this distance of the best score are flagged as
+\code{near_tie} (only when at least two qualify).}
 }
 \value{
-The plan data frame with added \code{score} and \code{recommended}
-columns.
+The plan data frame with added \code{score}, \code{recommended}, and
+\code{near_tie} columns. The active weights are attached as attribute
+\code{"weights"} and the per-scenario score decomposition as attribute
+\code{"score_components"}, so every recommendation can be audited.
 }
 \description{
 Computes a composite score for each scenario from \emph{observed} subset
@@ -34,6 +40,19 @@ normalised by span length), and \code{gaps} is
 \code{(mean_n_gap + mean_max_gap) / L}. Scenarios retaining no
 respondents receive \code{NA} and are never recommended. Ties are broken
 in favour of the larger sample.
+
+The score is a configurable heuristic, not a validated decision
+rule: the weights encode one reasonable trade-off, and the
+\code{recommended} flag marks the highest score under the declared
+weights, nothing more. Because the \code{size} term is normalised by the
+largest \code{n_ids} in the supplied set, a scenario's score depends on
+which scenarios it is compared with; scores are comparison-relative,
+not absolute properties of a scenario. Scenarios whose scores fall
+within \code{tie_tolerance} of the best are flagged in \code{near_tie},
+signalling that the heuristic does not meaningfully distinguish
+them; endpoint-requiring scenarios earn the \code{endpoints} term by
+construction, which is worth keeping in mind when comparing anchored
+with unanchored scenarios.
 }
 \examples{
 d <- generate_weasel_dummy_data(n_ids = 100, n_times = 10, seed = 1)
@@ -44,5 +63,9 @@ weasel_print_table(cmp, title = "Scenario comparison")
 # emphasise sample size more strongly
 cmp2 <- weasel_compare_scenarios(p, weights = c(size = 2))
 cmp2$scenario[cmp2$recommended]
+
+# audit the recommendation: active weights and score decomposition
+attr(cmp, "weights")
+attr(cmp, "score_components")
 
 }

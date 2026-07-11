@@ -64,7 +64,7 @@ Useful links:
 
 }
 \author{
-\strong{Maintainer}: Siard van den Bosch \email{siardvandenbosch@me.com}
+\strong{Maintainer}: Siard van den Bosch \email{siardvandenbosch@me.com} [copyright holder]
 
 }
 \keyword{internal}

@@ -36,20 +36,22 @@ test_that("custom scenario tables are validated", {
   d <- make_fixture()
   bad <- data.frame(scenario = "x", require_endpoints = TRUE,
                     max_missing = 1)  # missing n_gap_max, max_gap_max
-  expect_error(weasel_plan(d, "id", "time", scenarios = bad),
+  expect_error(weasel_plan(d, "id", "time", span = "full", scenarios = bad),
                "missing required column")
 
   dup <- data.frame(
     scenario = c("x", "x"), require_endpoints = c(TRUE, FALSE),
     max_missing = c(0, 1), n_gap_max = c(0, 1), max_gap_max = c(0, 1)
   )
-  expect_error(weasel_plan(d, "id", "time", scenarios = dup), "unique")
+  expect_error(weasel_plan(d, "id", "time", span = "full", scenarios = dup),
+               "unique")
 
   neg <- data.frame(
     scenario = "x", require_endpoints = TRUE,
     max_missing = -1, n_gap_max = 0, max_gap_max = 0
   )
-  expect_error(weasel_plan(d, "id", "time", scenarios = neg), ">= 0")
+  expect_error(weasel_plan(d, "id", "time", span = "full", scenarios = neg),
+               ">= 0")
 })
 
 test_that("scores are computed from observed outcomes with documented weights", {
@@ -126,9 +128,13 @@ test_that("observed grids handle non-consecutive wave schedules", {
   sub <- weasel_apply(p, "lenient")
   expect_equal(nrow(sub), nrow(d))
 
-  # core windows slide over the observed schedule
-  pc <- weasel_plan(d, "id", "time", span = "core", core_len = 4,
-                    grid = "observed")
+  # core windows slide over the observed schedule; on this fully
+  # crossed panel every window ties on coverage, which now warns
+  expect_warning(
+    pc <- weasel_plan(d, "id", "time", span = "core", core_len = 4,
+                      grid = "observed"),
+    class = "weasel_tied_windows"
+  )
   expect_equal(length(pc$span), 4L)
   expect_true(all(diff(pc$span) == 2L))
 })

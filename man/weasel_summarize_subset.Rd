@@ -20,7 +20,9 @@ weasel_summarize_subset(
 
 \item{data}{Optional long-format data frame; defaults to the data
 attached to \code{plan_obj}. Required when the plan was created with
-\code{keep_data = FALSE}.}
+\code{keep_data = FALSE}. Explicitly supplied data are checked against
+the plan's structural fingerprint (classed warning
+\code{weasel_data_mismatch} on mismatch).}
 
 \item{id}{Optional id column name; defaults to \code{plan_obj$id}.}
 

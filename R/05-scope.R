@@ -354,8 +354,9 @@ weasel_reshape_to_wide <- function() {
   mat <- as.matrix(pivot[, span_cols, drop = FALSE])
   if (nrow(mat) == 0) {
     return(list(
-      view = data.frame(waves = character(0), n = integer(0),
-                        ids = integer(0), stringsAsFactors = FALSE),
+      view = data.frame(pattern = integer(0), waves = character(0),
+                        n = integer(0), ids = integer(0),
+                        stringsAsFactors = FALSE),
       waves_by_id = character(0)
     ))
   }
@@ -377,6 +378,9 @@ weasel_reshape_to_wide <- function() {
   )
   view <- view[order(-view$ids, -view$n), , drop = FALSE]
   rownames(view) <- NULL
+  # stable pattern id: assigned after sorting, so filtering the table
+  # never renumbers patterns and ids remain valid selectors
+  view <- cbind(pattern = seq_len(nrow(view)), view)
 
   list(view = view, waves_by_id = pat)
 }
@@ -385,10 +389,13 @@ weasel_reshape_to_wide <- function() {
 #'
 #' Groups respondents by their observed-wave pattern and counts how many
 #' share each pattern. Requires [weasel_reshape_to_wide()] to have been
-#' called. In the result, `waves` is the pattern (a `.` marks a missing
-#' wave), `n` is the number of observed waves in that pattern, and `ids`
-#' is the number of respondents sharing it. Rows are sorted by `ids`,
-#' then `n`, both descending.
+#' called. In the result, `pattern` is a stable pattern id (the row
+#' number of the full summary; filtering with
+#' [weasel_filter_wave_summary()] keeps it, so it can always be passed
+#' to [weasel_get_data_by_row()]), `waves` is the pattern (a `.` marks a
+#' missing wave), `n` is the number of observed waves in that pattern,
+#' and `ids` is the number of respondents sharing it. Rows are sorted by
+#' `ids`, then `n`, both descending.
 #'
 #' @return The summary data frame, invisibly.
 #'
@@ -417,6 +424,9 @@ weasel_summarize_waves <- function() {
 #' Filter the wave-pattern summary
 #'
 #' Narrows the pattern table produced by [weasel_summarize_waves()].
+#' The `pattern` column keeps its original values, so pattern ids
+#' identified in a filtered table can be passed directly to
+#' [weasel_get_data_by_row()].
 #'
 #' @param n_range Optional length-2 numeric vector giving the min/max
 #'   number of observed waves per pattern (the `n` column).
@@ -465,12 +475,14 @@ weasel_filter_wave_summary <- function(n_range = NULL, ids_range = NULL) {
 #' After [weasel_summarize_waves()] has grouped respondents into
 #' patterns, this function extracts the long-format rows for every
 #' respondent who matches the given pattern row(s). Use
-#' [weasel_filter_wave_summary()] first to identify which row indices to
-#' request.
+#' [weasel_filter_wave_summary()] first to identify which patterns to
+#' request; the `pattern` ids it shows remain valid selectors here.
 #'
-#' @param i Integer vector of row indices into the wave-pattern summary;
-#'   respondents matching any of the selected patterns are returned.
-#'   Defaults to the first row.
+#' @param i Pattern selector: an integer vector of pattern ids (the
+#'   `pattern` column of the summary, which equals the row numbers of
+#'   the full, unfiltered table), or a character vector of pattern
+#'   strings (`waves` values). Respondents matching any selected
+#'   pattern are returned. Defaults to the first pattern.
 #' @param within_span If `TRUE`, only rows whose wave lies inside the
 #'   scoped span are returned. If `FALSE` (default), all rows of the
 #'   matching respondents are returned, including waves outside the
@@ -500,8 +512,20 @@ weasel_get_data_by_row <- function(i = 1L, within_span = FALSE) {
   }
   if (nrow(env$view) == 0) .weasel_stop("the pattern summary is empty.")
 
-  i <- suppressWarnings(as.integer(i))
-  if (length(i) == 0 || anyNA(i) || any(i < 1) || any(i > nrow(env$view))) {
+  if (is.character(i)) {
+    idx <- match(i, env$view$waves)
+    if (anyNA(idx)) {
+      .weasel_stop("pattern string(s) not found in the wave-pattern summary.")
+    }
+    i <- idx
+  }
+  ok <- is.numeric(i) && length(i) > 0 && !anyNA(i) &&
+    all(is.finite(i)) && all(abs(i - round(i)) <= 1e-8)
+  if (!ok) {
+    .weasel_stop("i must be pattern ids (integers) or pattern strings.")
+  }
+  i <- as.integer(round(i))
+  if (any(i < 1) || any(i > nrow(env$view))) {
     .weasel_stop("row index out of range.")
   }
   i <- unique(i)
