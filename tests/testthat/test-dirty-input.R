@@ -5,7 +5,7 @@ test_that("compare sentence never fabricates a recommendation", {
   d <- make_fixture()
   imp <- data.frame(
     scenario = c("s1", "s2"), require_endpoints = TRUE,
-    max_missing = 0, n_gap_max = 0, max_gap_max = 0
+    max_missing = 0, n_gap_max = 0, max_gap_len = 0
   )
   d2 <- d[d$id %in% c("d1", "f1"), ]  # nobody has both endpoints
   p <- suppressMessages(
@@ -92,7 +92,7 @@ test_that("justification refuses scenarios that retain nobody", {
   d <- make_fixture()
   imp <- data.frame(
     scenario = "impossible", require_endpoints = TRUE,
-    max_missing = 0, n_gap_max = 0, max_gap_max = 0
+    max_missing = 0, n_gap_max = 0, max_gap_len = 0
   )
   d2 <- d[d$id %in% c("d1", "f1"), ]
   p <- suppressMessages(
@@ -116,9 +116,9 @@ test_that("scenario matching uses prefixes, not substrings", {
 
 test_that("fractional constraint values are rejected, never truncated", {
   d <- make_fixture()
-  expect_error(set_weasel_scope(d, "id", "time", gap = 1.9), "fractional")
+  expect_error(set_weasel_scope(d, "id", "time", max_gap_len = 1.9), "fractional")
   expect_error(set_weasel_scope(d, "id", "time", lower = 2.6), "fractional")
-  expect_error(set_weasel_scope(d, "id", "time", size = c(3.5, 8)),
+  expect_error(set_weasel_scope(d, "id", "time", min_present = 3.5),
                "fractional")
   expect_error(weasel_plan(d, "id", "time", core_len = 6.5), "fractional")
 
@@ -126,13 +126,13 @@ test_that("fractional constraint values are rejected, never truncated", {
   expect_error(weasel_sensitivity(p, max_missing = 1.9), "fractional")
 
   sc <- data.frame(scenario = "s", require_endpoints = FALSE,
-                   max_missing = 1.5, n_gap_max = 8, max_gap_max = 8)
+                   max_missing = 1.5, n_gap_max = 8, max_gap_len = 8)
   expect_error(weasel_plan(d, "id", "time", span = "full", scenarios = sc),
                "fractional")
 
   # Inf remains a valid "no constraint" tolerance in scenario tables
   sc_inf <- data.frame(scenario = "s", require_endpoints = FALSE,
-                       max_missing = Inf, n_gap_max = Inf, max_gap_max = Inf)
+                       max_missing = Inf, n_gap_max = Inf, max_gap_len = Inf)
   p_inf <- weasel_plan(d, "id", "time", span = "full", scenarios = sc_inf)
   expect_equal(p_inf$plan$n_ids, 7L)
 
@@ -145,8 +145,8 @@ test_that("fractional constraint values are rejected, never truncated", {
 
 test_that("integer-valued doubles are still accepted everywhere", {
   d <- make_fixture()
-  expect_no_error(set_weasel_scope(d, "id", "time", gap = 2, lower = 1,
-                                   upper = 8, size = 3))
+  expect_no_error(set_weasel_scope(d, "id", "time", max_gap_len = 2,
+                                   lower = 1, upper = 8, min_present = 3))
   weasel_clear_scope()
   p <- weasel_plan(d, "id", "time", span = "core", core_len = 4)
   expect_s3_class(p, "weasel_plan")

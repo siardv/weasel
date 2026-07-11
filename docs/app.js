@@ -199,14 +199,14 @@ head(subset1)`,
     note:
       "In the pattern table, `waves` is the participation fingerprint (a '.' marks a missing " +
       "wave), `n` is the number of observed waves in that pattern, and `ids` counts the " +
-      "respondents who share it. The `gap` and `n_gap` arguments to `set_weasel_scope()` are " +
-      "enforced when `weasel_reshape_to_wide()` runs: respondents whose interior gaps exceed " +
-      "the limits are dropped, and a status message reports how many. Respondents with fewer " +
-      "observed waves than the scope minimum (3 by default; see `?set_weasel_scope`) are " +
-      "dropped as well. The `pattern` column is a stable row id: filter the table however " +
-      "you like, then pass a `pattern` value (or the `waves` string itself) to " +
-      "`weasel_get_data_by_row()`. To compare several tolerance settings side by side " +
-      "instead of committing to one, use the Plan pipeline.",
+      "respondents who share it. Structural constraints (`min_present`, `max_missing`, " +
+      "`max_gap_len`, `n_gap_max`, `require_endpoints`) are enforced when " +
+      "`weasel_reshape_to_wide()` runs: respondents outside the limits are dropped and a " +
+      "status message reports how many. By default `min_present = 1`, so every respondent " +
+      "with at least one observed wave is shown. The `pattern` column is a stable row id: " +
+      "filter the table however you like, then pass a `pattern` value (or the `waves` string " +
+      "itself) to `weasel_get_data_by_row()`. To compare several tolerance settings side by " +
+      "side instead of committing to one, use the Plan pipeline.",
   },
 
   result_scope_bounded: {
@@ -258,12 +258,13 @@ weasel_print_table(
 
 subset1 <- weasel_get_data_by_row(1)`,
     note:
-      "`gap` and `n_gap` are enforced at reshape time inside the bounded window: interior gaps " +
-      "are measured strictly between a respondent's first and last observed wave within the " +
-      "span, so late entry and early exit never count as gaps. Respondents exceeding the " +
-      "limits are dropped with a status message. To weigh several gap or missingness " +
-      "tolerances against each other before committing, use the Plan pipeline " +
-      "(`weasel_plan()` scenarios or `weasel_sensitivity()`).",
+      "`max_gap_len` and `n_gap_max` are enforced at reshape time inside the bounded window: " +
+      "interior gaps are measured strictly between a respondent's first and last observed " +
+      "wave within the span, so late entry and early exit never count as gaps. Respondents " +
+      "exceeding the limits are dropped with a status message. The same constraint names are " +
+      "used by plan scenario tables; to weigh several tolerances against each other before " +
+      "committing, use the Plan pipeline (`weasel_plan()` scenarios or " +
+      "`weasel_sensitivity()`).",
   },
 
   result_scope_learn: {

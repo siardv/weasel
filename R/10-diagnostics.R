@@ -14,10 +14,13 @@
 #' @param require_endpoints Logical values to evaluate.
 #' @param max_missing Integer tolerances for missing waves in the span.
 #' @param n_gap_max Integer tolerances for the number of interior gaps.
-#' @param max_gap_max Integer tolerances for the longest interior gap.
+#' @param max_gap_len Integer tolerances for the longest interior gap.
+#' @param max_gap_max Deprecated alias for `max_gap_len` (classed
+#'   warning `weasel_deprecated`); ignored when `max_gap_len` is
+#'   supplied explicitly.
 #'
 #' @return A data frame with one row per combination and the columns
-#'   `require_endpoints`, `max_missing`, `n_gap_max`, `max_gap_max`,
+#'   `require_endpoints`, `max_missing`, `n_gap_max`, `max_gap_len`,
 #'   `n_ids`, `prop_ids` (share of all respondents observed in the
 #'   span), and `mean_prop_present` (coverage among the retained
 #'   respondents; `NA` when nobody is retained).
@@ -33,11 +36,16 @@ weasel_sensitivity <- function(plan_obj,
                                require_endpoints = c(TRUE, FALSE),
                                max_missing = 0:3,
                                n_gap_max = 0:2,
-                               max_gap_max = 0:2) {
+                               max_gap_len = 0:2,
+                               max_gap_max = NULL) {
   .weasel_check_plan(plan_obj)
   idm <- plan_obj$id_metrics
   if (!is.data.frame(idm) || nrow(idm) == 0) {
     .weasel_stop("plan_obj$id_metrics is missing or empty.")
+  }
+  if (!is.null(max_gap_max)) {
+    .weasel_deprecate_arg("max_gap_max", "max_gap_len")
+    if (missing(max_gap_len)) max_gap_len <- max_gap_max
   }
 
   require_endpoints <- unique(as.logical(require_endpoints))
@@ -55,18 +63,18 @@ weasel_sensitivity <- function(plan_obj,
   }
   max_missing <- check_tol(max_missing, "max_missing")
   n_gap_max   <- check_tol(n_gap_max, "n_gap_max")
-  max_gap_max <- check_tol(max_gap_max, "max_gap_max")
+  max_gap_len <- check_tol(max_gap_len, "max_gap_len")
 
   g <- expand.grid(
-    max_gap_max       = max_gap_max,
+    max_gap_len       = max_gap_len,
     n_gap_max         = n_gap_max,
     max_missing       = max_missing,
     require_endpoints = require_endpoints,
     KEEP.OUT.ATTRS    = FALSE
   )
-  g <- g[c("require_endpoints", "max_missing", "n_gap_max", "max_gap_max")]
+  g <- g[c("require_endpoints", "max_missing", "n_gap_max", "max_gap_len")]
   g <- g[order(!g$require_endpoints, g$max_missing, g$n_gap_max,
-               g$max_gap_max), , drop = FALSE]
+               g$max_gap_len), , drop = FALSE]
   rownames(g) <- NULL
 
   n_total  <- nrow(idm)
@@ -74,7 +82,7 @@ weasel_sensitivity <- function(plan_obj,
   res <- vapply(seq_len(nrow(g)), function(i) {
     keep <- idm$n_missing <= g$max_missing[i] &
       idm$n_gap <= g$n_gap_max[i] &
-      idm$max_gap <= g$max_gap_max[i]
+      idm$max_gap <= g$max_gap_len[i]
     if (g$require_endpoints[i]) keep <- keep & anchored
     c(
       n   = sum(keep),

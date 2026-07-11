@@ -119,12 +119,13 @@ weasel_print_table(head(subset_row1, 8), title = "Most common pattern, data")
 ```
 
 You can also constrain patterns structurally when setting the scope.
-The `gap` argument limits the length of interior gaps (runs of missing
-waves strictly between a respondent's first and last observed wave),
-and `n_gap` limits how many such gaps are allowed:
+The `max_gap_len` argument limits the length of interior gaps (runs of
+missing waves strictly between a respondent's first and last observed
+wave), and `n_gap_max` limits how many such gaps are allowed; the same
+names are used by the plan pipeline's scenario tables:
 
 ```{r}
-set_weasel_scope(long_data, "id", "time", gap = 1, n_gap = 1)
+set_weasel_scope(long_data, "id", "time", max_gap_len = 1, n_gap_max = 1)
 evaluate_weasel_scope()
 weasel_reshape_to_wide()
 weasel_summarize_waves()

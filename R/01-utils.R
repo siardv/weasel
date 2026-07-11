@@ -24,6 +24,12 @@ the <- new.env(parent = emptyenv())
                class = "weasel_deprecated")
 }
 
+# deprecation warning for renamed arguments and table columns
+.weasel_deprecate_arg <- function(old, new, what = "argument") {
+  .weasel_warn(what, " '", old, "' is deprecated; use '", new,
+               "' instead.", class = "weasel_deprecated")
+}
+
 .weasel_is_installed <- function(pkg) requireNamespace(pkg, quietly = TRUE)
 
 .weasel_cli <- function() .weasel_is_installed("cli")
@@ -234,8 +240,14 @@ the <- new.env(parent = emptyenv())
 # validate a custom scenario table for weasel_plan()
 .weasel_check_scenarios <- function(scenarios) {
   required <- c("scenario", "require_endpoints", "max_missing",
-                "n_gap_max", "max_gap_max")
+                "n_gap_max", "max_gap_len")
   if (!is.data.frame(scenarios)) .weasel_stop("scenarios must be a data.frame.")
+  if (!("max_gap_len" %in% names(scenarios)) &&
+      "max_gap_max" %in% names(scenarios)) {
+    .weasel_deprecate_arg("max_gap_max", "max_gap_len",
+                          what = "scenario column")
+    names(scenarios)[names(scenarios) == "max_gap_max"] <- "max_gap_len"
+  }
   missing_cols <- setdiff(required, names(scenarios))
   if (length(missing_cols) > 0) {
     .weasel_stop("scenarios is missing required column(s): ",
@@ -252,7 +264,7 @@ the <- new.env(parent = emptyenv())
   if (anyNA(s$require_endpoints)) {
     .weasel_stop("scenario column 'require_endpoints' must not contain NA.")
   }
-  for (nm in c("max_missing", "n_gap_max", "max_gap_max")) {
+  for (nm in c("max_missing", "n_gap_max", "max_gap_len")) {
     s[[nm]] <- suppressWarnings(as.numeric(s[[nm]]))
     if (anyNA(s[[nm]])) {
       .weasel_stop("scenario column '", nm, "' must not contain NA.")

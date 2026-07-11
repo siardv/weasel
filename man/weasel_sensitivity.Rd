@@ -9,7 +9,8 @@ weasel_sensitivity(
   require_endpoints = c(TRUE, FALSE),
   max_missing = 0:3,
   n_gap_max = 0:2,
-  max_gap_max = 0:2
+  max_gap_len = 0:2,
+  max_gap_max = NULL
 )
 }
 \arguments{
@@ -21,11 +22,15 @@ weasel_sensitivity(
 
 \item{n_gap_max}{Integer tolerances for the number of interior gaps.}
 
-\item{max_gap_max}{Integer tolerances for the longest interior gap.}
+\item{max_gap_len}{Integer tolerances for the longest interior gap.}
+
+\item{max_gap_max}{Deprecated alias for \code{max_gap_len} (classed
+warning \code{weasel_deprecated}); ignored when \code{max_gap_len} is
+supplied explicitly.}
 }
 \value{
 A data frame with one row per combination and the columns
-\code{require_endpoints}, \code{max_missing}, \code{n_gap_max}, \code{max_gap_max},
+\code{require_endpoints}, \code{max_missing}, \code{n_gap_max}, \code{max_gap_len},
 \code{n_ids}, \code{prop_ids} (share of all respondents observed in the
 span), and \code{mean_prop_present} (coverage among the retained
 respondents; \code{NA} when nobody is retained).

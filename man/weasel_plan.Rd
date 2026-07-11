@@ -40,8 +40,10 @@ supplied; supplying both raises an error.}
 
 \item{scenarios}{Optional data frame of custom scenarios with the
 columns \code{scenario}, \code{require_endpoints}, \code{max_missing},
-\code{n_gap_max}, \code{max_gap_max}. The table is validated; missing
-columns raise an error.}
+\code{n_gap_max}, \code{max_gap_len}. The table is validated; missing
+columns raise an error. The pre-0.4 column name \code{max_gap_max} is
+still accepted with a deprecation warning (class
+\code{weasel_deprecated}).}
 
 \item{grid}{How the wave grid inside the span is defined.
 \code{"consecutive"} (default) treats every integer between the span

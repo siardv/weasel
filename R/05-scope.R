@@ -16,18 +16,30 @@
 #'   (integer, character, ...) is supported.
 #' @param wave Name of the wave/time column. Must be numeric with
 #'   integer-valued entries.
-#' @param size Optional integer vector of acceptable per-respondent
-#'   observation counts; respondents with fewer than `min(size)`
-#'   observed waves are dropped by [weasel_reshape_to_wide()]. Defaults
-#'   to `min(3, span length)` through the span length.
+#' @param min_present Single integer (default 1); respondents with
+#'   fewer observed waves inside the span are dropped by
+#'   [weasel_reshape_to_wide()]. The default keeps every respondent
+#'   with at least one observed wave, so exploration shows the full
+#'   participation landscape unless you narrow it.
+#' @param max_missing Optional integer; maximum allowed number of
+#'   missing waves inside the span. `NULL` (default) applies no
+#'   constraint.
+#' @param max_gap_len Optional integer; maximum allowed length of an
+#'   interior gap (a run of missing waves strictly between a
+#'   respondent's first and last observed wave inside the span).
+#'   `NULL` (default) applies no constraint.
+#' @param n_gap_max Optional integer; maximum allowed number of
+#'   interior gaps. `NULL` (default) applies no constraint.
+#' @param require_endpoints If `TRUE`, only respondents observed at
+#'   both the first and last wave of the span are kept. Default
+#'   `FALSE`.
 #' @param lower Optional lower bound of the wave range.
 #' @param upper Optional upper bound of the wave range.
-#' @param gap Optional integer; maximum allowed length of an interior
-#'   gap (a run of missing waves strictly between a respondent's first
-#'   and last observed wave inside the span). `NULL` (default) applies
-#'   no constraint.
-#' @param n_gap Optional integer; maximum allowed number of interior
-#'   gaps. `NULL` (default) applies no constraint.
+#' @param size,gap,n_gap Deprecated aliases (classed warning
+#'   `weasel_deprecated`): use `min_present` (for `size`, whose minimum
+#'   is used), `max_gap_len` (for `gap`), and `n_gap_max` (for
+#'   `n_gap`). An explicitly supplied new-name argument takes
+#'   precedence over its alias.
 #' @param grid How the wave grid inside the span is defined.
 #'   `"consecutive"` (default) treats every integer between `lower` and
 #'   `upper` as a scheduled wave; `"observed"` uses only wave values
@@ -47,7 +59,7 @@
 #' set_weasel_scope(d, "id", "time", upper = 8)
 #'
 #' # only respondents whose interior gaps are at most 1 wave long
-#' set_weasel_scope(d, "id", "time", gap = 1)
+#' set_weasel_scope(d, "id", "time", max_gap_len = 1)
 #'
 #' # biennial schedule: use the observed grid
 #' b <- generate_weasel_dummy_data(n_ids = 30, waves = seq(2008, 2018, 2),
@@ -60,13 +72,18 @@
 set_weasel_scope <- function(data,
                              id,
                              wave,
-                             size = NULL,
+                             min_present = 1L,
+                             max_missing = NULL,
+                             max_gap_len = NULL,
+                             n_gap_max = NULL,
+                             require_endpoints = FALSE,
                              lower = NULL,
                              upper = NULL,
-                             gap = NULL,
-                             n_gap = NULL,
                              grid = c("consecutive", "observed"),
-                             override = TRUE) {
+                             override = TRUE,
+                             size = NULL,
+                             gap = NULL,
+                             n_gap = NULL) {
   .weasel_check_id_wave(data, id, wave)
   grid  <- match.arg(grid)
   lower <- .weasel_check_bound(lower, "lower")
@@ -74,17 +91,41 @@ set_weasel_scope <- function(data,
   if (!is.null(lower) && !is.null(upper) && upper < lower) {
     .weasel_stop("upper must be >= lower.")
   }
-  gap   <- .weasel_check_count(gap, "gap")
-  n_gap <- .weasel_check_count(n_gap, "n_gap")
+
+  # deprecated aliases forward to the harmonized names; an explicitly
+  # supplied new-name argument always wins
   if (!is.null(size)) {
-    ok <- is.numeric(size) && length(size) > 0 && !anyNA(size) &&
-      all(is.finite(size)) && all(abs(size - round(size)) <= 1e-8) &&
-      all(size >= 1)
-    if (!ok) {
-      .weasel_stop("size must be a vector of positive integers ",
-                   "(fractional values are rejected, not truncated).")
+    .weasel_deprecate_arg("size", "min_present")
+    if (missing(min_present)) {
+      ok <- is.numeric(size) && length(size) > 0 && !anyNA(size) &&
+        all(is.finite(size)) && all(abs(size - round(size)) <= 1e-8) &&
+        all(size >= 1)
+      if (!ok) {
+        .weasel_stop("size must be a vector of positive integers ",
+                     "(fractional values are rejected, not truncated).")
+      }
+      min_present <- min(as.integer(round(size)))
     }
-    size <- as.integer(round(size))
+  }
+  if (!is.null(gap)) {
+    .weasel_deprecate_arg("gap", "max_gap_len")
+    if (is.null(max_gap_len)) max_gap_len <- gap
+  }
+  if (!is.null(n_gap)) {
+    .weasel_deprecate_arg("n_gap", "n_gap_max")
+    if (is.null(n_gap_max)) n_gap_max <- n_gap
+  }
+
+  min_present <- .weasel_check_count(min_present, "min_present")
+  if (is.null(min_present) || min_present < 1) {
+    .weasel_stop("min_present must be a single integer >= 1.")
+  }
+  max_missing <- .weasel_check_count(max_missing, "max_missing")
+  max_gap_len <- .weasel_check_count(max_gap_len, "max_gap_len")
+  n_gap_max   <- .weasel_check_count(n_gap_max, "n_gap_max")
+  if (!is.logical(require_endpoints) || length(require_endpoints) != 1 ||
+      is.na(require_endpoints)) {
+    .weasel_stop("require_endpoints must be TRUE or FALSE.")
   }
 
   if (!is.null(the$scope) && !isTRUE(override)) {
@@ -92,15 +133,17 @@ set_weasel_scope <- function(data,
   }
 
   env <- new.env(parent = emptyenv())
-  env$data  <- data
-  env$id    <- id
-  env$wave  <- wave
-  env$size  <- size
-  env$lower <- lower
-  env$upper <- upper
-  env$gap   <- gap
-  env$n_gap <- n_gap
-  env$grid  <- grid
+  env$data              <- data
+  env$id                <- id
+  env$wave              <- wave
+  env$min_present       <- min_present
+  env$max_missing       <- max_missing
+  env$max_gap_len       <- max_gap_len
+  env$n_gap_max         <- n_gap_max
+  env$require_endpoints <- require_endpoints
+  env$lower             <- lower
+  env$upper             <- upper
+  env$grid              <- grid
 
   the$scope <- env
   .weasel_ok(weasel_text(post = " scope set"))
@@ -144,13 +187,14 @@ assert_weasel_scope <- function() {
 #' scope is set.
 #'
 #' @return Invisibly, a list with the scope settings (`id`, `wave`,
-#'   `grid`, `lower`, `upper`, `span`, `size`, `gap`, `n_gap`) and the
-#'   progress counters (`n_rows`, `n_kept`, `n_patterns`), or `NULL`
-#'   when no scope is active.
+#'   `grid`, `lower`, `upper`, `span`, `min_present`, `max_missing`,
+#'   `max_gap_len`, `n_gap_max`, `require_endpoints`) and the progress
+#'   counters (`n_rows`, `n_kept`, `n_patterns`), or `NULL` when no
+#'   scope is active.
 #'
 #' @examples
 #' d <- generate_weasel_dummy_data(n_ids = 30, n_times = 6, seed = 1)
-#' set_weasel_scope(d, "id", "time", gap = 1)
+#' set_weasel_scope(d, "id", "time", max_gap_len = 1)
 #' weasel_scope_info()
 #' weasel_reshape_to_wide()
 #' weasel_summarize_waves()
@@ -182,9 +226,21 @@ weasel_scope_info <- function() {
     cat("  span:        not evaluated yet", req, "\n", sep = "")
   }
   cons <- character(0)
-  if (!is.null(env$size))  cons <- c(cons, paste0("size >= ", min(env$size)))
-  if (!is.null(env$gap))   cons <- c(cons, paste0("max interior gap <= ", env$gap))
-  if (!is.null(env$n_gap)) cons <- c(cons, paste0("interior gaps <= ", env$n_gap))
+  if (env$min_present > 1) {
+    cons <- c(cons, paste0("min_present >= ", env$min_present))
+  }
+  if (!is.null(env$max_missing)) {
+    cons <- c(cons, paste0("missing waves <= ", env$max_missing))
+  }
+  if (!is.null(env$max_gap_len)) {
+    cons <- c(cons, paste0("max interior gap <= ", env$max_gap_len))
+  }
+  if (!is.null(env$n_gap_max)) {
+    cons <- c(cons, paste0("interior gaps <= ", env$n_gap_max))
+  }
+  if (isTRUE(env$require_endpoints)) {
+    cons <- c(cons, "endpoints required")
+  }
   cat("  constraints: ",
       if (length(cons) > 0) paste(cons, collapse = ", ") else "none",
       "\n", sep = "")
@@ -199,18 +255,21 @@ weasel_scope_info <- function() {
   invisible(list(
     id = env$id, wave = env$wave, grid = env$grid,
     lower = env$lower, upper = env$upper, span = env$span,
-    size = env$size, gap = env$gap, n_gap = env$n_gap,
+    min_present = env$min_present, max_missing = env$max_missing,
+    max_gap_len = env$max_gap_len, n_gap_max = env$n_gap_max,
+    require_endpoints = env$require_endpoints,
     n_rows = nrow(env$data),
     n_kept = if (!is.null(env$pivot)) nrow(env$pivot) else NA_integer_,
     n_patterns = if (!is.null(env$view)) nrow(env$view) else NA_integer_
   ))
 }
 
-#' Evaluate wave bounds, grid, and valid window sizes
+#' Evaluate wave bounds and the grid
 #'
-#' Finalises `lower`, `upper`, the wave grid, and `size` within the
-#' active scope. Called automatically by [weasel_reshape_to_wide()], but
-#' can be run explicitly to inspect bounds before reshaping. With
+#' Finalises `lower`, `upper`, and the wave grid within the active
+#' scope, and validates `min_present` against the span length. Called
+#' automatically by [weasel_reshape_to_wide()], but can be run
+#' explicitly to inspect bounds before reshaping. With
 #' `grid = "consecutive"`, a warning (class `weasel_empty_waves`) is
 #' issued once per scope when the span contains waves that no respondent
 #' has, since such waves count as missed by everyone.
@@ -243,18 +302,13 @@ evaluate_weasel_scope <- function() {
   }
 
   span_len <- length(env$span)
-  if (is.null(env$size)) {
-    env$size <- seq.int(min(3L, span_len), span_len)
+  if (env$min_present > span_len) {
+    .weasel_stop("min_present (", env$min_present, ") exceeds the span ",
+                 env$lower, ":", env$upper, ", which has only ", span_len,
+                 " wave(s).")
   }
-  env$span_len   <- span_len
-  env$valid_size <- env$size[env$size <= span_len]
-  if (length(env$valid_size) == 0) {
-    .weasel_stop("no valid window size: the span ", env$lower, ":", env$upper,
-                 " has length ", span_len,
-                 " but the requested size values are ",
-                 paste(env$size, collapse = ", "), ".")
-  }
-  env$min_obs <- min(env$valid_size)
+  env$span_len <- span_len
+  env$min_obs  <- env$min_present
 
   invisible(env)
 }
@@ -263,10 +317,11 @@ evaluate_weasel_scope <- function() {
 #'
 #' Builds a respondent x wave data frame where each cell contains the
 #' wave number if the respondent is observed, and `NA` otherwise.
-#' Respondents with fewer than `min(valid size)` observed waves are
-#' dropped, and the optional `gap`/`n_gap` constraints from
-#' [set_weasel_scope()] are applied to interior gaps. Duplicated
-#' (id, wave) rows are counted once and trigger a warning.
+#' Respondents with fewer than `min_present` observed waves are
+#' dropped, and the optional `max_missing`, `max_gap_len`, `n_gap_max`,
+#' and `require_endpoints` constraints from [set_weasel_scope()] are
+#' applied. Duplicated (id, wave) rows are counted once and trigger a
+#' warning.
 #'
 #' @return The pivot data frame, invisibly.
 #'
@@ -307,22 +362,28 @@ weasel_reshape_to_wide <- function() {
   met <- .weasel_gap_metrics(ids_v, pos, L)
 
   keep <- met$n_present >= env$min_obs
-  if (!is.null(env$gap)) {
-    keep <- keep & met$max_gap <= env$gap
+  if (!is.null(env$max_missing)) {
+    keep <- keep & (L - met$n_present) <= env$max_missing
   }
-  if (!is.null(env$n_gap)) {
-    keep <- keep & met$n_gap <= env$n_gap
+  if (!is.null(env$max_gap_len)) {
+    keep <- keep & met$max_gap <= env$max_gap_len
+  }
+  if (!is.null(env$n_gap_max)) {
+    keep <- keep & met$n_gap <= env$n_gap_max
+  }
+  if (isTRUE(env$require_endpoints)) {
+    keep <- keep & met$has_lower & met$has_upper
   }
 
   n_dropped <- sum(!keep)
   if (n_dropped > 0) {
-    .weasel_msg(n_dropped, " respondent(s) dropped by size/gap constraints; ",
-                sum(keep), " kept.")
+    .weasel_msg(n_dropped, " respondent(s) dropped by the scope ",
+                "constraints; ", sum(keep), " kept.")
   }
 
   ids2 <- met$id[keep]
   if (length(ids2) == 0) {
-    .weasel_stop("no respondents satisfy the size/gap constraints.")
+    .weasel_stop("no respondents satisfy the scope constraints.")
   }
 
   sel <- ids_v %in% ids2
