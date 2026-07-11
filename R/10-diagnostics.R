@@ -115,7 +115,9 @@ weasel_sensitivity <- function(plan_obj,
 #'   columns.
 #' @param data Optional long-format data frame; defaults to the data
 #'   attached to `plan_obj`. Required when the plan was created with
-#'   `keep_data = FALSE`.
+#'   `keep_data = FALSE`. Explicitly supplied data are checked against
+#'   the plan's structural fingerprint (classed warning
+#'   `weasel_data_mismatch` on mismatch).
 #' @param at Either `"first"` (value at the first observed wave in the
 #'   span) or `"mean"` (mean over observed waves in the span).
 #'
@@ -144,6 +146,7 @@ weasel_selectivity <- function(plan_obj, scenario, vars = NULL, data = NULL,
                  class = "weasel_error_scenario")
   }
 
+  user_data <- !is.null(data)
   if (is.null(data)) data <- attr(plan_obj, "data")
   if (is.null(data)) {
     .weasel_stop("no data available: the plan was created with ",
@@ -153,6 +156,7 @@ weasel_selectivity <- function(plan_obj, scenario, vars = NULL, data = NULL,
   id   <- plan_obj$id
   wave <- plan_obj$wave
   .weasel_check_id_wave(data, id, wave)
+  if (user_data) .weasel_check_fingerprint(plan_obj, data, id, wave)
 
   ids_keep <- row$ids[[1]]
   if (length(ids_keep) == 0) {

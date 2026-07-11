@@ -203,8 +203,10 @@ head(subset1)`,
       "enforced when `weasel_reshape_to_wide()` runs: respondents whose interior gaps exceed " +
       "the limits are dropped, and a status message reports how many. Respondents with fewer " +
       "observed waves than the scope minimum (3 by default; see `?set_weasel_scope`) are " +
-      "dropped as well. To compare several tolerance settings side by side instead of " +
-      "committing to one, use the Plan pipeline.",
+      "dropped as well. The `pattern` column is a stable row id: filter the table however " +
+      "you like, then pass a `pattern` value (or the `waves` string itself) to " +
+      "`weasel_get_data_by_row()`. To compare several tolerance settings side by side " +
+      "instead of committing to one, use the Plan pipeline.",
   },
 
   result_scope_bounded: {

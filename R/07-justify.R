@@ -85,6 +85,16 @@ weasel_justify_subset <- function(plan_obj,
   note <- if ("note" %in% names(row)) as.character(get1(row$note)) else NA_character_
   grid <- .weasel_or(plan_obj$grid, "consecutive")
 
+  pop <- plan_obj[["population"]]
+  pop_txt <- if (!is.null(pop)) {
+    sprintf(
+      "The planning population comprised %s respondent(s) observed at least once within the analysis window, out of %s distinct respondent(s) in the supplied data; retention figures are relative to this in-window population.",
+      pop$n_ids_in_span, pop$n_ids_data
+    )
+  } else {
+    NULL
+  }
+
   fmt <- function(x) .weasel_format_num(x, digits)
 
   waves_txt <- if (!is.na(lower) && !is.na(upper)) {
@@ -195,6 +205,7 @@ weasel_justify_subset <- function(plan_obj,
       } else {
         "This strategy reflects an explicit trade-off between sample size and within-window completeness."
       },
+      pop_txt,
       if (length(diag_parts) > 0) {
         paste0("In the resulting subset, ",
                paste(diag_parts, collapse = ", "), ".")
@@ -203,10 +214,14 @@ weasel_justify_subset <- function(plan_obj,
         sprintf("This scenario is characterized as: %s.", note)
       } else NULL,
       if (!is.na(span_reason) && nzchar(span_reason)) {
-        sprintf(
-          "The analysis window was selected using the package's span rule (%s), which prioritizes a coherent window with comparatively strong participation.",
-          span_reason
-        )
+        if (identical(span_reason, "explicit")) {
+          "The analysis window was fixed a priori through explicit bounds supplied to the planning call, rather than chosen by an automatic rule."
+        } else {
+          sprintf(
+            "The analysis window was selected using the package's span rule (%s), which prioritizes a coherent window with comparatively strong participation.",
+            span_reason
+          )
+        }
       } else NULL,
       "All selection decisions were rule-based and reproducible, and can be regenerated from the same inputs and parameters using the weasel workflow."
     )
@@ -231,6 +246,7 @@ weasel_justify_subset <- function(plan_obj,
     if (!is.na(n_ids)) {
       sprintf("Under these criteria, %s respondent(s) were retained.", n_ids)
     } else NULL,
+    pop_txt,
     if (length(diag_parts) > 0) {
       paste0("Subset diagnostics indicated that ",
              paste(diag_parts, collapse = " and "), ".")
@@ -242,10 +258,14 @@ weasel_justify_subset <- function(plan_obj,
       )
     } else NULL,
     if (!is.na(span_reason) && nzchar(span_reason)) {
-      sprintf(
-        "The chosen window was produced by the package's span rule (%s). In practice, this emphasizes a stable segment of the panel rather than maximizing the nominal wave range.",
-        span_reason
-      )
+      if (identical(span_reason, "explicit")) {
+        "The analysis window was fixed a priori through explicit bounds supplied to the planning call, rather than produced by a coverage rule; the window choice is therefore a design decision documented here."
+      } else {
+        sprintf(
+          "The chosen window was produced by the package's span rule (%s). In practice, this emphasizes a stable segment of the panel rather than maximizing the nominal wave range.",
+          span_reason
+        )
+      }
     } else NULL,
     "This approach improves transparency because the inclusion set is fully determined by declared constraints (window bounds, endpoint handling, and permitted missingness structure) rather than subjective post hoc decisions."
   )

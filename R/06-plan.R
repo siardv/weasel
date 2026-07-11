@@ -68,7 +68,7 @@
   if (span == "full") {
     if (grid == "consecutive") .weasel_warn_empty_span(grid_full, waves)
     return(list(lower = lower_full, upper = upper_full,
-                span = grid_full, reason = "full"))
+                span = grid_full, reason = "full", candidates = NULL))
   }
 
   W <- length(grid_full)
@@ -82,10 +82,32 @@
   cs   <- c(0L, cumsum(cov))
   win <- cs[(L + 1L):(W + 1L)] - cs[seq_len(W - L + 1L)]
   best_i <- which.max(win)
+  n_tied <- sum(win == win[best_i])
+
+  # every candidate window with its objective value, so the selection
+  # is inspectable instead of a silent argmax
+  starts <- seq_len(W - L + 1L)
+  candidates <- data.frame(
+    lower    = grid_full[starts],
+    upper    = grid_full[starts + L - 1L],
+    coverage = as.integer(win),
+    chosen   = starts == best_i,
+    stringsAsFactors = FALSE
+  )
 
   chosen <- grid_full[best_i:(best_i + L - 1L)]
+  if (n_tied > 1L) {
+    .weasel_warn(
+      n_tied, " candidate windows tie on coverage (", win[best_i],
+      " respondent-wave observations); the earliest, ", chosen[1L], ":",
+      chosen[L], ", is used. inspect $span_candidates, or set explicit ",
+      "lower/upper bounds to pick another window.",
+      class = "weasel_tied_windows"
+    )
+  }
   if (grid == "consecutive") .weasel_warn_empty_span(chosen, waves)
-  list(lower = chosen[1L], upper = chosen[L], span = chosen, reason = "core")
+  list(lower = chosen[1L], upper = chosen[L], span = chosen,
+       reason = "core", candidates = candidates)
 }
 
 # ---- exported planning functions ------------------------------------------
@@ -109,7 +131,7 @@
 #' weasel_match_scenario("anchored_strict", choices)
 #' weasel_match_scenario("lenient", choices)  # unique prefix
 #'
-#' # ambiguous substring errors: "anchored" matches two scenarios
+#' # ambiguous prefix errors: "anchored" starts two scenarios
 #' try(weasel_match_scenario("anchored", choices))
 #'
 #' @export
@@ -145,14 +167,32 @@ weasel_match_scenario <- function(scenario, choices) {
 #' respondents receive `NA` and are never recommended. Ties are broken
 #' in favour of the larger sample.
 #'
+#' The score is a configurable heuristic, not a validated decision
+#' rule: the weights encode one reasonable trade-off, and the
+#' `recommended` flag marks the highest score under the declared
+#' weights, nothing more. Because the `size` term is normalised by the
+#' largest `n_ids` in the supplied set, a scenario's score depends on
+#' which scenarios it is compared with; scores are comparison-relative,
+#' not absolute properties of a scenario. Scenarios whose scores fall
+#' within `tie_tolerance` of the best are flagged in `near_tie`,
+#' signalling that the heuristic does not meaningfully distinguish
+#' them; endpoint-requiring scenarios earn the `endpoints` term by
+#' construction, which is worth keeping in mind when comparing anchored
+#' with unanchored scenarios.
+#'
 #' @param plan_obj A list with element `plan` (data frame of scenarios),
 #'   as returned by [weasel_plan()].
 #' @param weights Named numeric vector overriding any of the default
 #'   weights `c(coverage = 2, endpoints = 1.2, size = 0.8,
 #'   missing = 0.6, gaps = 0.4)`. `NA` values are rejected.
+#' @param tie_tolerance Single non-negative number; scenarios whose
+#'   scores are within this distance of the best score are flagged as
+#'   `near_tie` (only when at least two qualify).
 #'
-#' @return The plan data frame with added `score` and `recommended`
-#'   columns.
+#' @return The plan data frame with added `score`, `recommended`, and
+#'   `near_tie` columns. The active weights are attached as attribute
+#'   `"weights"` and the per-scenario score decomposition as attribute
+#'   `"score_components"`, so every recommendation can be audited.
 #'
 #' @examples
 #' d <- generate_weasel_dummy_data(n_ids = 100, n_times = 10, seed = 1)
@@ -164,8 +204,13 @@ weasel_match_scenario <- function(scenario, choices) {
 #' cmp2 <- weasel_compare_scenarios(p, weights = c(size = 2))
 #' cmp2$scenario[cmp2$recommended]
 #'
+#' # audit the recommendation: active weights and score decomposition
+#' attr(cmp, "weights")
+#' attr(cmp, "score_components")
+#'
 #' @export
-weasel_compare_scenarios <- function(plan_obj, weights = NULL) {
+weasel_compare_scenarios <- function(plan_obj, weights = NULL,
+                                     tie_tolerance = 0.01) {
   p <- plan_obj$plan
   if (!is.data.frame(p)) .weasel_stop("plan_obj$plan must be a data.frame.")
 
@@ -180,6 +225,10 @@ weasel_compare_scenarios <- function(plan_obj, weights = NULL) {
     weights <- suppressWarnings(as.numeric(weights))
     if (anyNA(weights)) .weasel_stop("weights must not contain NA.")
     w[wn] <- weights
+  }
+  tie_tolerance <- suppressWarnings(as.numeric(tie_tolerance[1]))
+  if (is.na(tie_tolerance) || tie_tolerance < 0) {
+    .weasel_stop("tie_tolerance must be a single non-negative number.")
   }
 
   num_cols <- c("mean_prop_present", "endpoint_rate", "worst_missing",
@@ -201,6 +250,28 @@ weasel_compare_scenarios <- function(plan_obj, weights = NULL) {
     best <- rankable[order(-p$score[rankable], -p$n_ids[rankable])][1]
     p$recommended[best] <- TRUE
   }
+
+  # flag practical ties: scenarios whose scores are within tie_tolerance
+  # of the best are not meaningfully distinguished by the heuristic
+  p$near_tie <- FALSE
+  if (length(rankable) > 0) {
+    best_score <- max(p$score[rankable])
+    close_i <- rankable[best_score - p$score[rankable] <= tie_tolerance]
+    if (length(close_i) >= 2) p$near_tie[close_i] <- TRUE
+  }
+
+  # expose the active weights and the per-scenario score decomposition,
+  # so the heuristic is auditable rather than a sealed number
+  attr(p, "weights") <- w
+  attr(p, "score_components") <- data.frame(
+    scenario  = p$scenario,
+    coverage  = w[["coverage"]] * p$mean_prop_present,
+    endpoints = w[["endpoints"]] * p$endpoint_rate,
+    size      = w[["size"]] * size_term,
+    missing   = -w[["missing"]] * (p$worst_missing / pmax(p$L, 1)),
+    gaps      = -w[["gaps"]] * ((p$mean_n_gap + p$mean_max_gap) / pmax(p$L, 1)),
+    stringsAsFactors = FALSE
+  )
 
   p
 }
@@ -243,7 +314,8 @@ weasel_compare_to_sentence <- function(cmp, digits = 3) {
     }
   } else {
     rec <- cmp[rec_i[1], , drop = FALSE]
-    paste0("Recommended scenario: ", dQuote(rec$scenario, FALSE), ".")
+    paste0("Recommended scenario (highest composite score under the ",
+           "declared weights): ", dQuote(rec$scenario, FALSE), ".")
   }
   for (i in seq_len(nrow(cmp))) {
     r <- cmp[i, , drop = FALSE]
@@ -253,6 +325,13 @@ weasel_compare_to_sentence <- function(cmp, digits = 3) {
       r$n_ids,
       .weasel_format_num(as.numeric(r$mean_prop_present), digits),
       .weasel_format_num(as.numeric(r$endpoint_rate), digits)
+    ))
+  }
+  if (!is.null(cmp$near_tie) && sum(cmp$near_tie, na.rm = TRUE) >= 2) {
+    lines <- c(lines, paste0(
+      "Note: ", sum(cmp$near_tie, na.rm = TRUE), " scenarios score ",
+      "within the tie tolerance; the recommendation is not unique on ",
+      "the score alone."
     ))
   }
   paste(lines, collapse = " ")
@@ -275,9 +354,20 @@ weasel_compare_to_sentence <- function(cmp, digits = 3) {
 #'   is supported.
 #' @param wave Name of the wave/time column. Must be numeric with
 #'   integer-valued entries.
-#' @param span Either `"core"` (highest-coverage window of `core_len`
-#'   consecutive grid waves) or `"full"` (all waves).
+#' @param span Either `"core"` (window of `core_len` consecutive grid
+#'   waves with the highest total respondent-wave coverage; exact
+#'   coverage ties are resolved in favour of the earliest window with a
+#'   classed warning, `weasel_tied_windows`, and every candidate window
+#'   is stored in the returned `span_candidates` table) or `"full"`
+#'   (all waves). Ignored when explicit `lower`/`upper` bounds are
+#'   supplied; supplying both raises an error.
 #' @param core_len Integer; desired window length when `span = "core"`.
+#' @param lower,upper Optional explicit integer window bounds. When
+#'   either is supplied the analysis window is fixed a priori
+#'   (`span_reason = "explicit"`), which the justification text reports
+#'   as a design decision rather than an automatic selection. Bounds
+#'   are interpreted on the chosen `grid`; the effective bounds are the
+#'   first and last grid waves inside the requested range.
 #' @param scenarios Optional data frame of custom scenarios with the
 #'   columns `scenario`, `require_endpoints`, `max_missing`,
 #'   `n_gap_max`, `max_gap_max`. The table is validated; missing
@@ -299,10 +389,17 @@ weasel_compare_to_sentence <- function(cmp, digits = 3) {
 #'
 #' @return A list of class `weasel_plan` with elements `plan` (scored
 #'   scenario table), `id_metrics`, `lower`, `upper`, `span` (integer
-#'   vector of grid waves), `grid`, `span_reason`, `id`, and `wave`.
-#'   When `keep_data = TRUE` the original `data` is attached as an
-#'   attribute. Printing the object shows a compact summary instead of
-#'   the raw list.
+#'   vector of grid waves), `grid`, `span_reason` (`"core"`, `"full"`,
+#'   or `"explicit"`), `span_candidates` (for core spans, every
+#'   candidate window with its coverage and a `chosen` flag; `NULL`
+#'   otherwise), `population` (the planning denominator: rows and
+#'   distinct ids in the data, ids and unique pairs observed in the
+#'   span; all retention proportions are relative to
+#'   `"observed_in_span"`), `fingerprint` (a structural fingerprint of
+#'   the data used to detect mismatched reunions later), `id`, and
+#'   `wave`. When `keep_data = TRUE` the original `data` is attached as
+#'   an attribute. Printing the object shows a compact summary instead
+#'   of the raw list.
 #'
 #' @examples
 #' d <- generate_weasel_dummy_data(n_ids = 100, n_times = 10, seed = 1)
@@ -320,6 +417,10 @@ weasel_compare_to_sentence <- function(cmp, digits = 3) {
 #'                                 seed = 1)
 #' pb <- weasel_plan(b, "id", "time", span = "full", grid = "observed")
 #'
+#' # a design-determined window: fix the bounds a priori
+#' pe <- weasel_plan(d, "id", "time", lower = 3, upper = 8)
+#' pe$span_reason
+#'
 #' @export
 weasel_plan <- function(data,
                         id,
@@ -328,20 +429,44 @@ weasel_plan <- function(data,
                         core_len = 6L,
                         scenarios = NULL,
                         grid = c("consecutive", "observed"),
-                        keep_data = TRUE) {
+                        keep_data = TRUE,
+                        lower = NULL,
+                        upper = NULL) {
+  span_given <- !missing(span)
   .weasel_check_id_wave(data, id, wave)
   span <- match.arg(span)
   grid <- match.arg(grid)
   core_len <- .weasel_or(.weasel_check_count(core_len, "core_len"), 6L)
+  lower <- .weasel_check_bound(lower, "lower")
+  upper <- .weasel_check_bound(upper, "upper")
   .weasel_check_duplicates(
     data[!is.na(data[[id]]) & !is.na(data[[wave]]), c(id, wave), drop = FALSE],
     id, wave
   )
 
-  span_pick <- .weasel_choose_span(data, id, wave,
-                                   span = span,
-                                   min_len = core_len,
-                                   grid = grid)
+  if (!is.null(lower) || !is.null(upper)) {
+    # explicit a-priori window: recorded as such, so justification text
+    # never attributes the window to an automatic rule
+    if (span_given) {
+      .weasel_stop("supply either span = \"core\"/\"full\" or explicit ",
+                   "lower/upper bounds, not both.")
+    }
+    waves_all <- .weasel_check_wave(data[[wave]], wave)
+    lo <- .weasel_or(lower, min(waves_all))
+    up <- .weasel_or(upper, max(waves_all))
+    if (up < lo) .weasel_stop("upper must be >= lower.")
+    span_vec0 <- .weasel_grid_waves(waves_all, lo, up, grid)
+    if (grid == "consecutive") .weasel_warn_empty_span(span_vec0, waves_all)
+    span_pick <- list(lower = span_vec0[1L],
+                      upper = span_vec0[length(span_vec0)],
+                      span = span_vec0, reason = "explicit",
+                      candidates = NULL)
+  } else {
+    span_pick <- .weasel_choose_span(data, id, wave,
+                                     span = span,
+                                     min_len = core_len,
+                                     grid = grid)
+  }
   lower       <- span_pick$lower
   upper       <- span_pick$upper
   span_vec    <- span_pick$span
@@ -421,16 +546,28 @@ weasel_plan <- function(data,
   .weasel_ok("plan ready: span ", lower, ":", upper,
              " (", span_reason, ", ", grid_txt, ")")
 
+  ids_nonmissing <- data[[id]][!is.na(data[[id]])]
+  population <- list(
+    denominator     = "observed_in_span",
+    n_rows_data     = nrow(data),
+    n_ids_data      = length(unique(ids_nonmissing)),
+    n_ids_in_span   = nrow(idm),
+    n_pairs_in_span = as.integer(sum(idm$n_present))
+  )
+
   obj <- list(
-    plan        = plan,
-    id_metrics  = idm,
-    lower       = lower,
-    upper       = upper,
-    span        = span_vec,
-    grid        = grid,
-    span_reason = span_reason,
-    id          = id,
-    wave        = wave
+    plan            = plan,
+    id_metrics      = idm,
+    lower           = lower,
+    upper           = upper,
+    span            = span_vec,
+    grid            = grid,
+    span_reason     = span_reason,
+    span_candidates = span_pick$candidates,
+    population      = population,
+    fingerprint     = .weasel_data_fingerprint(data, id, wave),
+    id              = id,
+    wave            = wave
   )
   if (isTRUE(keep_data)) attr(obj, "data") <- data
   class(obj) <- "weasel_plan"
@@ -468,11 +605,28 @@ print.weasel_plan <- function(x, digits = 3, ...) {
   cat("  span: ", x$lower, ":", x$upper, " (",
       .weasel_or(x$span_reason, "?"), ", ", grid_txt, ")\n", sep = "")
   cat("  respondents observed in span: ", nrow(x$id_metrics), "\n", sep = "")
+  pop <- x[["population"]]
+  if (!is.null(pop)) {
+    cat("  population: ", pop$n_ids_in_span, " of ", pop$n_ids_data,
+        " distinct ids observed in span (denominator: ",
+        pop$denominator, ")\n", sep = "")
+  }
+  cand <- x[["span_candidates"]]
+  if (!is.null(cand)) {
+    n_tied <- sum(cand$coverage == max(cand$coverage))
+    if (n_tied > 1L) {
+      cat("  note: earliest of ", n_tied, " coverage-tied windows ",
+          "(see $span_candidates)\n", sep = "")
+    }
+  }
 
   cols <- intersect(c("scenario", "n_ids", "mean_prop_present",
-                      "endpoint_rate", "score", "recommended"),
+                      "endpoint_rate", "score", "recommended", "near_tie"),
                     names(x$plan))
   tab <- x$plan[cols]
+  if ("near_tie" %in% names(tab) && !any(tab$near_tie)) {
+    tab$near_tie <- NULL
+  }
   for (nm in names(tab)) tab[[nm]] <- .weasel_maybe_round(tab[[nm]], digits)
   print(tab, row.names = FALSE)
 
@@ -499,7 +653,10 @@ print.weasel_plan <- function(x, digits = 3, ...) {
 #' @param scenario Name (or unambiguous abbreviation) of the scenario.
 #' @param data Optional long-format data frame; defaults to the data
 #'   attached to `plan_obj`. Required when the plan was created with
-#'   `keep_data = FALSE`.
+#'   `keep_data = FALSE`. Explicitly supplied data are compared with
+#'   the plan's structural fingerprint; a mismatch triggers a classed
+#'   warning (`weasel_data_mismatch`), since the plan's id lists were
+#'   computed on the original data.
 #'
 #' @return A data frame.
 #'
@@ -528,6 +685,7 @@ weasel_apply <- function(plan_obj, scenario, data = NULL) {
                  class = "weasel_error_scenario")
   }
 
+  user_data <- !is.null(data)
   if (is.null(data)) data <- attr(plan_obj, "data")
   if (is.null(data)) {
     .weasel_stop("no data available: the plan was created with ",
@@ -537,6 +695,7 @@ weasel_apply <- function(plan_obj, scenario, data = NULL) {
   id_col   <- plan_obj$id
   wave_col <- plan_obj$wave
   .weasel_check_id_wave(data, id_col, wave_col)
+  if (user_data) .weasel_check_fingerprint(plan_obj, data, id_col, wave_col)
 
   ids_keep <- row$ids[[1]]
   sp    <- .weasel_plan_span(plan_obj, row)
@@ -562,7 +721,9 @@ weasel_apply <- function(plan_obj, scenario, data = NULL) {
 #' @param scenario Name of the scenario to summarize.
 #' @param data Optional long-format data frame; defaults to the data
 #'   attached to `plan_obj`. Required when the plan was created with
-#'   `keep_data = FALSE`.
+#'   `keep_data = FALSE`. Explicitly supplied data are checked against
+#'   the plan's structural fingerprint (classed warning
+#'   `weasel_data_mismatch` on mismatch).
 #' @param id Optional id column name; defaults to `plan_obj$id`.
 #' @param wave Optional wave column name; defaults to `plan_obj$wave`.
 #' @param digits Number of decimal places for the sentence output.
@@ -584,6 +745,7 @@ weasel_summarize_subset <- function(plan_obj, scenario, data = NULL,
                                     id = NULL, wave = NULL, digits = 3) {
   .weasel_check_plan(plan_obj)
 
+  user_data <- !is.null(data)
   if (is.null(data)) data <- attr(plan_obj, "data")
   if (is.null(data)) {
     .weasel_stop("no data available: the plan was created with ",
@@ -593,6 +755,7 @@ weasel_summarize_subset <- function(plan_obj, scenario, data = NULL,
   if (is.null(id))   id   <- plan_obj$id
   if (is.null(wave)) wave <- plan_obj$wave
   .weasel_check_id_wave(data, id, wave)
+  if (user_data) .weasel_check_fingerprint(plan_obj, data, id, wave)
 
   scenario <- weasel_match_scenario(scenario, plan_obj$plan$scenario)
   row <- plan_obj$plan[plan_obj$plan$scenario == scenario, , drop = FALSE]

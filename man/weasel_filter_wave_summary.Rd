@@ -18,6 +18,9 @@ A filtered data frame.
 }
 \description{
 Narrows the pattern table produced by \code{\link[=weasel_summarize_waves]{weasel_summarize_waves()}}.
+The \code{pattern} column keeps its original values, so pattern ids
+identified in a filtered table can be passed directly to
+\code{\link[=weasel_get_data_by_row]{weasel_get_data_by_row()}}.
 }
 \examples{
 d <- generate_weasel_dummy_data(n_ids = 50, n_times = 8, seed = 1)
