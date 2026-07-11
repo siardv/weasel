@@ -315,9 +315,12 @@ the <- new.env(parent = emptyenv())
 }
 
 # grid waves of a plan, with a fallback for objects saved by older
-# versions that only stored the bounds
+# versions that only stored the bounds; exact [[ ]] indexing is
+# essential here: with $, a missing 'span' partial-matches
+# 'span_reason' and the "full"/"core" label coerces to NA, silently
+# emptying every downstream subset
 .weasel_plan_span <- function(plan_obj, row) {
-  sp <- plan_obj$span
+  sp <- plan_obj[["span"]]
   if (!is.null(sp)) return(as.integer(sp))
   .weasel_seq_int(row$lower[[1]], row$upper[[1]])
 }
