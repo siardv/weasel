@@ -1,0 +1,9 @@
+bibentry(
+  bibtype = "Manual",
+  header  = "To cite weasel in publications use:",
+  title   = "weasel: Wave-Based Extraction and Selection for Longitudinal Data",
+  author  = person("Siard", "van den Bosch"),
+  year    = if (!is.null(meta$Date)) substr(meta$Date, 1, 4) else "2026",
+  note    = paste("R package version", meta$Version),
+  url     = "https://github.com/siardv/weasel"
+)

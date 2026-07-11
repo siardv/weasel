@@ -33,3 +33,7 @@ jobs:
             echo "::error::NEWS.md has no '# weasel ${ver}' heading"
             exit 1
           fi
+          if ! grep -q "^version: \"${ver}\"" CITATION.cff; then
+            echo "::error::CITATION.cff version does not match ${ver}"
+            exit 1
+          fi

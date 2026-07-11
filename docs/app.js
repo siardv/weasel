@@ -183,7 +183,9 @@ const TREE = {
         note: "extract long-format data for every respondent matching pattern row i",
       },
     ],
-    code: `d <- your_data  # long-format: id, time, var1 ...
+    code: `library(weasel)
+
+d <- your_data  # long-format: id, time, var1 ...
 
 set_weasel_scope(d, "id", "time")
 evaluate_weasel_scope()
@@ -196,10 +198,13 @@ subset1 <- weasel_get_data_by_row(1)
 head(subset1)`,
     note:
       "In the pattern table, `waves` is the participation fingerprint (a '.' marks a missing " +
-      "wave), `n` is the window length, and `ids` counts the respondents who share that pattern. " +
-      "The `gap` and `n_gap` arguments to `set_weasel_scope()` are stored for reference but do not " +
-      "filter respondents in the Scope pipeline; gaps simply appear as distinct patterns. " +
-      "To enforce a maximum gap or missingness limit, use the Plan pipeline.",
+      "wave), `n` is the number of observed waves in that pattern, and `ids` counts the " +
+      "respondents who share it. The `gap` and `n_gap` arguments to `set_weasel_scope()` are " +
+      "enforced when `weasel_reshape_to_wide()` runs: respondents whose interior gaps exceed " +
+      "the limits are dropped, and a status message reports how many. Respondents with fewer " +
+      "observed waves than the scope minimum (3 by default; see `?set_weasel_scope`) are " +
+      "dropped as well. To compare several tolerance settings side by side instead of " +
+      "committing to one, use the Plan pipeline.",
   },
 
   result_scope_bounded: {
@@ -235,7 +240,9 @@ head(subset1)`,
         note: "retrieve long-format data for the selected pattern row",
       },
     ],
-    code: `d <- your_data
+    code: `library(weasel)
+
+d <- your_data
 
 set_weasel_scope(d, "id", "time", upper = 10)
 evaluate_weasel_scope()
@@ -249,10 +256,12 @@ weasel_print_table(
 
 subset1 <- weasel_get_data_by_row(1)`,
     note:
-      "`gap` and `n_gap` are accepted by `set_weasel_scope()` but are inert in the Scope " +
-      "pipeline: every respondent observed at the minimum number of waves is retained, " +
-      "and any gaps appear as separate rows in the pattern table. If you need to drop " +
-      "respondents who exceed a gap or missingness threshold, that is the Plan pipeline's job.",
+      "`gap` and `n_gap` are enforced at reshape time inside the bounded window: interior gaps " +
+      "are measured strictly between a respondent's first and last observed wave within the " +
+      "span, so late entry and early exit never count as gaps. Respondents exceeding the " +
+      "limits are dropped with a status message. To weigh several gap or missingness " +
+      "tolerances against each other before committing, use the Plan pipeline " +
+      "(`weasel_plan()` scenarios or `weasel_sensitivity()`).",
   },
 
   result_scope_learn: {
@@ -262,17 +271,14 @@ subset1 <- weasel_get_data_by_row(1)`,
     heading: "Scope pipeline: learning with synthetic data",
     summary:
       "Generate a synthetic panel and walk through the Scope pipeline step by step. " +
-      "The generator records missed waves as item-level NA on a complete (id by wave) grid, " +
-      "so before the row-presence pipeline can detect participation patterns you define " +
-      "observation by a focal outcome: keep only the rows where that outcome was recorded.",
+      "The generator produces long-format data in which a missed wave is an absent row, " +
+      "exactly how the package defines observation, by layering random skips, attention " +
+      "decay, permanent attrition, and block dropout, so realistic participation patterns " +
+      "are visible immediately.",
     steps: [
       {
         fn: "generate_weasel_dummy_data(n_ids = 200, seed = 42)",
         note: "create a 200-respondent by 13-wave panel; fix the seed for reproducibility",
-      },
-      {
-        fn: 'd <- d[!is.na(d$var1), ]',
-        note: "define a wave as observed only when the focal outcome `var1` is present; this turns item-level NA into absent rows",
       },
       {
         fn: 'set_weasel_scope(d, "id", "time", upper = 10)',
@@ -301,12 +307,8 @@ subset1 <- weasel_get_data_by_row(1)`,
     ],
     code: `library(weasel)
 
+# a missed wave is an absent row, as in real long-format panel files
 d <- generate_weasel_dummy_data(n_ids = 200, seed = 42)
-
-# the generator stores missed waves as item-level NA on a complete
-# (id x wave) grid; define observation by a focal outcome so the
-# row-presence pipeline can see participation patterns
-d <- d[!is.na(d$var1), ]
 
 set_weasel_scope(d, "id", "time", upper = 10)
 evaluate_weasel_scope()
@@ -318,11 +320,13 @@ weasel_print_table(weasel_filter_wave_summary(), title = "Wave patterns", n = 10
 subset1 <- weasel_get_data_by_row(1)
 head(subset1)`,
     note:
-      "Without the focal-outcome step the synthetic grid is complete, so `weasel_summarize_waves()` " +
-      "returns a single all-observed pattern. Keying observation to `var1` exposes the " +
-      "generator's attrition, block, and attention-decay missingness as genuine wave-level " +
-      "patterns. With real data, where missed waves are already absent rows, this step is " +
-      "unnecessary.",
+      "Item nonresponse (`NA` values inside outcome columns of observed rows, controlled by " +
+      "`prop_item_missing`) is distinct from wave-level missingness and never affects " +
+      "selection: participation is defined by row presence alone. If your research question " +
+      "requires keying observation to outcome availability instead, filter first " +
+      "(`d <- d[!is.na(d$var1), ]`) and state that redefinition explicitly in your methods " +
+      "text. For biennial or other non-consecutive schedules, generate with " +
+      "`waves = seq(2008, 2020, 2)` and analyse with `grid = \"observed\"`.",
   },
 
   result_plan_core: {
@@ -355,7 +359,9 @@ head(subset1)`,
         note: "produce the filtered long-format data frame for the chosen scenario",
       },
     ],
-    code: `d <- your_data
+    code: `library(weasel)
+
+d <- your_data
 
 p   <- weasel_plan(d, "id", "time", span = "core")
 cmp <- weasel_compare_scenarios(p)
@@ -400,7 +406,9 @@ dim(analysis_data)`,
         note: "extract the analysis-ready long-format data frame",
       },
     ],
-    code: `d <- your_data
+    code: `library(weasel)
+
+d <- your_data
 
 p   <- weasel_plan(d, "id", "time", span = "full")
 cmp <- weasel_compare_scenarios(p)
@@ -448,7 +456,9 @@ dim(analysis_data)`,
         note: 'generate the methods paragraph; `style` controls verbosity: `"methods"` (default), `"concise"`, or `"extended"`',
       },
     ],
-    code: `d <- your_data
+    code: `library(weasel)
+
+d <- your_data
 
 p   <- weasel_plan(d, "id", "time", span = "core")
 cmp <- weasel_compare_scenarios(p)
@@ -507,7 +517,9 @@ cat(weasel_justify_subset(p, "anchored_balanced",
         note: "generate the methods paragraph documenting window bounds, constraints, and statistics",
       },
     ],
-    code: `d <- your_data
+    code: `library(weasel)
+
+d <- your_data
 
 p   <- weasel_plan(d, "id", "time", span = "full")
 cmp <- weasel_compare_scenarios(p)
@@ -530,16 +542,13 @@ cat(weasel_justify_subset(p, "anchored_balanced",
     summary:
       "Generate a dummy panel and walk through the complete Plan pipeline: build scenarios, " +
       "inspect the scored comparison table, audit your preferred choice with per-wave " +
-      "coverage and missingness statistics, and extract the filtered data. As in the Scope " +
-      "examples, define observation by a focal outcome first so the scenarios actually differ.",
+      "coverage and missingness statistics, and extract the filtered data. The generator's " +
+      "layered wave-level missingness produces genuine trade-offs between stringency and " +
+      "sample size.",
     steps: [
       {
         fn: "generate_weasel_dummy_data(n_ids = 100, seed = 1)",
         note: "create a 100-respondent synthetic panel with layered item-level missingness",
-      },
-      {
-        fn: 'd <- d[!is.na(d$var1), ]',
-        note: "key observation to the focal outcome `var1`; without this every scenario keeps all respondents",
       },
       {
         fn: 'weasel_plan(d, "id", "time", span = "core")',
@@ -560,11 +569,8 @@ cat(weasel_justify_subset(p, "anchored_balanced",
     ],
     code: `library(weasel)
 
+# wave-level missingness is genuine: a missed wave is an absent row
 d <- generate_weasel_dummy_data(n_ids = 100, seed = 1)
-
-# define observation by a focal outcome (the generator stores missed
-# waves as item-level NA on a complete grid)
-d <- d[!is.na(d$var1), ]
 
 p   <- weasel_plan(d, "id", "time", span = "core")
 cmp <- weasel_compare_scenarios(p)
@@ -579,9 +585,11 @@ cat(weasel_subset_to_sentence(s), "\\n")
 balanced <- weasel_apply(p, "anchored_balanced")
 dim(balanced)`,
     note:
-      "On the raw synthetic grid all three scenarios coincide (every respondent is observed " +
-      "at every wave), so the comparison table looks degenerate. The focal-outcome step is " +
-      "what produces the coverage and sample-size trade-offs the table is meant to show.",
+      "The three default scenarios retain different samples because the synthetic panel " +
+      "contains genuine wave-level missingness: stricter scenarios keep fewer respondents " +
+      "at higher within-window completeness. Item nonresponse inside observed rows does not " +
+      "affect selection; see the Scope walkthrough note if you need observation keyed to " +
+      "outcome availability.",
   },
 
   result_demo: {
@@ -597,7 +605,7 @@ dim(balanced)`,
     steps: [
       {
         fn: "weasel_example(seed = 42)",
-        note: "run the complete demonstration; returns a named list invisibly: `data`, `plan`, `compare`, `summary`",
+        note: "run the complete demonstration; returns a named list invisibly: `data`, `plan`, `compare`, `summary`, `sensitivity`",
       },
     ],
     code: `library(weasel)
@@ -609,19 +617,18 @@ res <- weasel_example(seed = 42)
 # res$plan    : the weasel_plan() object
 # res$compare : the scored scenario comparison table
 # res$summary : weasel_summarize_subset() output for anchored_balanced
+# res$sensitivity : weasel_sensitivity() tolerance sweep for the plan
 
 weasel_print_table(res$compare, title = "Scenarios from the demo")
 
 balanced <- weasel_apply(res$plan, "anchored_balanced")
 dim(balanced)`,
     note:
-      "`weasel_example()` runs on the raw generator output, whose missingness is item-level " +
-      "on a complete grid. Its Scope step therefore prints a single all-observed pattern and " +
-      "its three scenarios keep the same respondents. To see differentiated patterns and " +
-      "scenarios, key observation to a focal outcome (`d <- d[!is.na(d$var1), ]`) as in the " +
-      "learning walkthroughs, or run the pipelines on real data. Explore `res$plan$id_metrics` " +
-      "for per-respondent gap and missingness data, and `res$summary$per_wave_coverage` for " +
-      "wave-level participation counts.",
+      "`weasel_example()` runs on the generator's default output, which contains genuine " +
+      "wave-level missingness, so the Scope step prints a varied pattern table and the three " +
+      "scenarios retain different samples. Explore `res$plan$id_metrics` for per-respondent " +
+      "gap and missingness data, `res$summary$per_wave_coverage` for wave-level participation " +
+      "counts, and `res$sensitivity` for the tolerance sweep.",
   },
 };
 
