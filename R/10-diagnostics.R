@@ -45,11 +45,13 @@ weasel_sensitivity <- function(plan_obj,
     .weasel_stop("require_endpoints must contain TRUE and/or FALSE.")
   }
   check_tol <- function(x, name) {
-    x <- unique(suppressWarnings(as.integer(x)))
-    if (length(x) == 0 || anyNA(x) || any(x < 0)) {
-      .weasel_stop(name, " must be non-negative integers.")
+    ok <- is.numeric(x) && length(x) > 0 && !anyNA(x) &&
+      all(is.finite(x)) && all(abs(x - round(x)) <= 1e-8) && all(x >= 0)
+    if (!ok) {
+      .weasel_stop(name, " must be non-negative integers ",
+                   "(fractional values are rejected, not truncated).")
     }
-    sort(x)
+    sort(unique(as.integer(round(x))))
   }
   max_missing <- check_tol(max_missing, "max_missing")
   n_gap_max   <- check_tol(n_gap_max, "n_gap_max")
@@ -98,7 +100,10 @@ weasel_sensitivity <- function(plan_obj,
 #' from their first observed wave inside the span (`at = "first"`, the
 #' usual baseline comparison) or as the mean over their observed waves
 #' in the span (`at = "mean"`). Missing item values are dropped within
-#' each group. The SMD divides the group difference by the pooled
+#' each group. Duplicated (id, wave) rows trigger a classed warning
+#' (`weasel_duplicates`) and their covariate values are averaged within
+#' each pair first, so the diagnostic counts each pair once and does
+#' not depend on the row order of the input. The SMD divides the group difference by the pooled
 #' standard deviation `sqrt((sd_retained^2 + sd_excluded^2) / 2)`;
 #' absolute values around 0.1 or larger are commonly read as noteworthy
 #' imbalance. The SMD is `NA` when either group has no spread.
@@ -178,11 +183,46 @@ weasel_selectivity <- function(plan_obj, scenario, vars = NULL, data = NULL,
       .weasel_stop("vars must be numeric or logical columns; not: ",
                    paste(bad, collapse = ", "))
     }
+    vars <- setdiff(vars, c(id, wave))
   }
   if (length(vars) == 0) .weasel_stop("no numeric covariates to compare.")
 
   w_int <- as.integer(round(data[[wave]]))
   sub <- data[!is.na(data[[id]]) & (w_int %in% sp), , drop = FALSE]
+
+  # duplicated (id, wave) rows would make the baseline depend on the
+  # input row order (at = "first") or be double-counted (at = "mean");
+  # average covariates within each duplicated pair so the diagnostic is
+  # deterministic and counts each pair once, mirroring the plan metrics
+  sub <- sub[c(id, wave, vars)]
+  w_key <- as.integer(round(sub[[wave]]))
+  dd <- .weasel_dedup_index(sub[[id]], w_key)
+  if (dd$n_dup > 0) {
+    .weasel_warn(
+      dd$n_dup, " duplicated (", id, ", ", wave, ") row(s) in the span; ",
+      "covariate values are averaged within each duplicated pair so the ",
+      "diagnostic is deterministic and counts each pair once.",
+      class = "weasel_duplicates"
+    )
+    o     <- order(sub[[id]], w_key)
+    ids_o <- sub[[id]][o]
+    w_o   <- w_key[o]
+    n_o   <- length(o)
+    new_pair <- c(TRUE, ids_o[-1L] != ids_o[-n_o] | w_o[-1L] != w_o[-n_o])
+    grp   <- cumsum(new_pair)
+    agg <- data.frame(ids_o[new_pair], w_o[new_pair],
+                      stringsAsFactors = FALSE)
+    names(agg) <- c(id, wave)
+    for (v in vars) {
+      x    <- as.numeric(sub[[v]][o])
+      sums <- rowsum(ifelse(is.na(x), 0, x), grp)
+      cnts <- rowsum(as.numeric(!is.na(x)), grp)
+      m    <- as.numeric(sums / cnts)
+      m[cnts == 0] <- NA_real_
+      agg[[v]] <- m
+    }
+    sub <- agg
+  }
 
   # one baseline value per respondent per covariate
   if (at == "first") {

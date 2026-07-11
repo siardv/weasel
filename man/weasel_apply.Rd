@@ -22,7 +22,10 @@ A data frame.
 Subsets the original data to the respondents and wave range selected
 by a given scenario. This is typically the final step: after
 reviewing \code{\link[=weasel_compare_scenarios]{weasel_compare_scenarios()}}, pick a scenario and call this
-to get the analysis-ready data frame.
+to get the analysis-ready data frame. Selection metrics count each
+(id, wave) pair once, but output rows are returned as they appear in
+the data; if duplicated pairs remain in the result, a classed warning
+(\code{weasel_duplicates}) reminds you to resolve them before modelling.
 }
 \examples{
 d <- generate_weasel_dummy_data(n_ids = 100, n_times = 10, seed = 1)
@@ -31,8 +34,8 @@ p <- weasel_plan(d, "id", "time", span = "core")
 balanced <- weasel_apply(p, "anchored_balanced")
 dim(balanced)
 
-# abbreviations work when unambiguous
-strict <- weasel_apply(p, "strict")
+# unambiguous prefixes work
+strict <- weasel_apply(p, "anchored_s")
 dim(strict)
 
 # plans built with keep_data = FALSE need the data passed back in

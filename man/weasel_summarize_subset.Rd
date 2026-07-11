@@ -37,7 +37,10 @@ Computes headline statistics, per-wave coverage, and a missingness
 distribution for a specific scenario. Use this to audit a scenario
 before committing to \code{\link[=weasel_apply]{weasel_apply()}}. By default the data and
 column names stored in the plan object are reused; supply \code{data},
-\code{id}, or \code{wave} only to override them.
+\code{id}, or \code{wave} only to override them. \code{headline$n_rows} counts
+physical rows; when duplicated (id, wave) rows are present it
+therefore exceeds the deduplicated pair count, and a classed warning
+(\code{weasel_duplicates}) is emitted.
 }
 \examples{
 d <- generate_weasel_dummy_data(n_ids = 100, n_times = 10, seed = 1)

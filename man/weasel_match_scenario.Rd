@@ -17,15 +17,17 @@ The matched scenario name.
 \description{
 Used internally by \code{\link[=weasel_apply]{weasel_apply()}} and \code{\link[=weasel_summarize_subset]{weasel_summarize_subset()}},
 but also useful when building custom workflows. Accepts either an
-exact name or an unambiguous substring.
+exact name or an unambiguous prefix; arbitrary substrings are not
+matched, so an abbreviation always selects the scenario it visibly
+starts.
 }
 \examples{
 choices <- c("anchored_strict", "anchored_balanced", "lenient_info_max")
 
 weasel_match_scenario("anchored_strict", choices)
-weasel_match_scenario("lenient", choices)
+weasel_match_scenario("lenient", choices)  # unique prefix
 
-# ambiguous substring errors: "anchored" matches two scenarios
+# ambiguous prefix errors: "anchored" matches two scenarios
 try(weasel_match_scenario("anchored", choices))
 
 }

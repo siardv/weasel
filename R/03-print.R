@@ -27,16 +27,11 @@
 #' @export
 weasel_print_table <- function(x, title = NULL, digits = 3, n = NULL) {
   if (!inherits(x, "data.frame")) .weasel_stop("x must be a data.frame.")
-  digits <- suppressWarnings(as.integer(digits[1]))
-  if (is.na(digits) || digits < 0) {
+  if (is.null(digits)) {
     .weasel_stop("digits must be a single non-negative integer.")
   }
-  if (!is.null(n)) {
-    n <- suppressWarnings(as.integer(n[1]))
-    if (is.na(n) || n < 0) {
-      .weasel_stop("n must be a single non-negative integer.")
-    }
-  }
+  digits <- .weasel_check_count(digits, "digits")
+  n <- .weasel_check_count(n, "n")
 
   if (!is.null(title)) .weasel_h2(title)
 

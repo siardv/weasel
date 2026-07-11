@@ -6,7 +6,9 @@
 #' methods section to explain and justify their subset selection. The
 #' text references the structural constraints (endpoints, interior
 #' gaps, span length), frames the choice as a coverage-vs-sample-size
-#' trade-off, and optionally cites the package.
+#' trade-off, and optionally cites the package. A scenario that retains
+#' no respondents cannot be justified and raises a classed error
+#' (`weasel_error_empty_scenario`).
 #'
 #' @param plan_obj Object returned by [weasel_plan()].
 #' @param scenario Name (or unambiguous abbreviation) of the scenario.
@@ -55,6 +57,12 @@ weasel_justify_subset <- function(plan_obj,
   if (nrow(row) != 1) {
     .weasel_stop("scenario not found or ambiguous.",
                  class = "weasel_error_scenario")
+  }
+  n_check <- suppressWarnings(as.integer(row$n_ids[[1]]))
+  if (!is.na(n_check) && n_check == 0) {
+    .weasel_stop("scenario '", scenario, "' retains no respondents; ",
+                 "there is nothing to justify.",
+                 class = "weasel_error_empty_scenario")
   }
 
   get1 <- function(x) if (length(x) == 0) NA else x[[1]]
