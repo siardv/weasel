@@ -11,6 +11,11 @@ across survey waves. A respondent counts as observed at a wave when a
 row with that (id, wave) pair exists in the long-format data; a missed
 wave is an absent row.
 
+> **Repository history note:** Some early, pre-`v0.3.1` development
+> history was consolidated while the repository workflow was being refined.
+> A forthcoming update will add brief archival provenance information;
+> the current releases and documentation remain canonical.
+
 ## Installation
 
 ```r
