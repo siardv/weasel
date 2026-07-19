@@ -1074,7 +1074,11 @@ document.addEventListener("DOMContentLoaded", () => {
     scrollToStage("auto");
     root.style.scrollBehavior = "";
   }
-});
 
-window.addEventListener("popstate", applyUrl);
-window.addEventListener("hashchange", applyUrl);
+  // back/forward buttons and manual hash edits re-derive state from
+  // the url; registered here so the file stays free of load-time
+  // browser globals (the guide-snippets CI loads it with a bare
+  // document stub to read TREE)
+  window.addEventListener("popstate", applyUrl);
+  window.addEventListener("hashchange", applyUrl);
+});
