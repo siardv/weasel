@@ -96,7 +96,7 @@ const TREE = {
     explanation:
       "`weasel_justify_subset()` generates a structured paragraph (in methods, concise, or " +
       "extended style) that documents the window bounds, structural constraints, resulting " +
-      "sample size, and key coverage statistics, with optional in-text citation. " +
+      "sample size, and key coverage statistics, with an automatic in-text citation. " +
       "If you are writing a manuscript, registered report, or pre-registration where the " +
       "data-preparation stage must be reported transparently, answer Yes.",
     yes: {
@@ -467,9 +467,9 @@ weasel_print_table(weasel_sensitivity(p, max_missing = 0:2), n = 8)`,
     summary:
       "Build a scenario plan over the highest-coverage consecutive wave window, " +
       "select a scenario, and generate a structured paragraph for your methods section. " +
-      "`weasel_justify_subset()` produces text in three verbosity styles and supports " +
-      "formal in-text citation. Designed for pre-registered studies and manuscripts " +
-      "where the data-preparation stage must be documented transparently.",
+      "`weasel_justify_subset()` produces text in three verbosity styles and adds a " +
+      "formal in-text citation automatically. Designed for pre-registered studies and " +
+      "manuscripts where the data-preparation stage must be documented transparently.",
     steps: [
       {
         fn: 'weasel_plan(data, "id", "time", span = "core")',
@@ -505,20 +505,22 @@ weasel_print_table(s$headline)
 
 analysis_data <- weasel_apply(p, "anchored_balanced")
 
-# full methods-section paragraph
+# full methods-section paragraph; the in-text citation
+# (package author and year) is added automatically
 cat(weasel_justify_subset(p, "anchored_balanced"), "\\n")
 
-# two-sentence version for supplementary material
+# short summary for supplementary material
 cat(weasel_justify_subset(p, "anchored_balanced", style = "concise"), "\\n")
 
-# with formal in-text citation
-cat(weasel_justify_subset(p, "anchored_balanced",
-                          author = "Last Name", year = "2026"), "\\n")`,
+# without the citation
+cat(weasel_justify_subset(p, "anchored_balanced", cite = FALSE), "\\n")`,
     note:
       'Three verbosity styles are available: `"methods"` (full paragraph, default), ' +
-      '`"concise"` (two sentences, suitable for supplementary sections), and ' +
-      '`"extended"` (detailed rationale with sensitivity framing). ' +
-      "Supply `author` and `year` to embed a formal citation instead of the default package reference.",
+      '`"concise"` (short summary, suitable for supplementary sections), and ' +
+      '`"extended"` (detailed rationale). ' +
+      "The in-text citation is derived automatically from the package metadata, " +
+      "for example `(van den Bosch, 2026)`; supply `author` and `year` to override " +
+      "it, or `cite = FALSE` to omit it.",
   },
 
   result_plan_justify_full: {
@@ -563,11 +565,12 @@ weasel_print_table(cmp, title = "Full-span scenarios")
 
 analysis_data <- weasel_apply(p, "anchored_balanced")
 
-cat(weasel_justify_subset(p, "anchored_balanced",
-                          author = "Last Name", year = "2026"), "\\n")`,
+# the citation (package author and year) is included automatically
+cat(weasel_justify_subset(p, "anchored_balanced"), "\\n")`,
     note:
-      "Supply `author` and `year` for a formal citation. Style options: " +
-      '`"methods"` (default), `"concise"`, and `"extended"`.',
+      "The in-text citation is automatic; supply `author` and `year` only to " +
+      'override it, or `cite = FALSE` to omit it. Style options: `"methods"` ' +
+      '(default), `"concise"`, and `"extended"`.',
   },
 
   result_plan_learn: {
@@ -668,12 +671,59 @@ dim(balanced)`,
   },
 };
 
+// url state: every node is reachable by exactly one path from the root,
+// so a readable slug for the current node encodes the entire flow
+
+const SLUGS = {
+  goal: "goal",
+  dummy_purpose: "dummy-data",
+  dummy_goal: "dummy-pipeline",
+  scope_range: "scope-range",
+  plan_doc: "plan-methods",
+  plan_span_justify: "plan-methods-span",
+  plan_span: "plan-span",
+  result_scope_full: "scope-full",
+  result_scope_bounded: "scope-bounded",
+  result_scope_learn: "scope-learn",
+  result_plan_core: "plan-core",
+  result_plan_full: "plan-full",
+  result_plan_justify_core: "plan-core-methods",
+  result_plan_justify_full: "plan-full-methods",
+  result_plan_learn: "plan-learn",
+  result_demo: "demo",
+};
+
+const SLUG_TO_NODE = {};
+for (const id in SLUGS) SLUG_TO_NODE[SLUGS[id]] = id;
+
+// child -> { nodeId: parent, answer } lookup, built once from the tree
+const PARENT = {};
+for (const id in TREE) {
+  const node = TREE[id];
+  if (node.type !== "question") continue;
+  PARENT[node.yes.next] = { nodeId: id, answer: "yes" };
+  PARENT[node.no.next] = { nodeId: id, answer: "no" };
+}
+
+// rebuild the answer trail leading from the root to a node
+function pathTo(nodeId) {
+  const trail = [];
+  let cursor = nodeId;
+  while (PARENT[cursor]) {
+    trail.unshift(PARENT[cursor]);
+    cursor = PARENT[cursor].nodeId;
+  }
+  return trail;
+}
+
 // state
 
 let state = {
   history: [], // { nodeId, answer: 'yes'|'no' }
   current: "start",
 };
+
+const BASE_TITLE = document.title;
 
 // helpers
 
@@ -726,11 +776,71 @@ function highlightR(src) {
   return out;
 }
 
+// url sync
+
+function currentSlug() {
+  return SLUGS[state.current] || "";
+}
+
+function flowUrl() {
+  const slug = currentSlug();
+  return location.href.split("#")[0] + (slug ? "#" + slug : "");
+}
+
+// reflect the current node in the address bar; one history entry per answer
+function syncUrl() {
+  const slug = currentSlug();
+  if (location.hash.replace(/^#/, "") === slug) return;
+  try {
+    history.pushState(
+      null,
+      "",
+      slug ? "#" + slug : location.pathname + location.search,
+    );
+  } catch (e) {
+    location.hash = slug;
+  }
+}
+
+function stateFromUrl() {
+  let slug = location.hash.replace(/^#/, "");
+  try {
+    slug = decodeURIComponent(slug);
+  } catch (e) {
+    // malformed escape sequence: treat as unknown
+  }
+  const nodeId = SLUG_TO_NODE[slug];
+  if (!nodeId) return { history: [], current: "start" };
+  return { history: pathTo(nodeId), current: nodeId };
+}
+
+// re-derive state from the url (back/forward buttons, manual hash edits)
+function applyUrl() {
+  const next = stateFromUrl();
+  if (next.current === state.current) return;
+  state = next;
+  render();
+  scrollToStage();
+}
+
 // rendering
 
 function render() {
   renderTrail();
   renderStage();
+  syncTitle();
+}
+
+function syncTitle() {
+  const node = TREE[state.current];
+  document.title =
+    node.type === "result" ? node.heading + " · weasel" : BASE_TITLE;
+}
+
+function scrollToStage(behavior) {
+  document
+    .getElementById("tree-stage")
+    .scrollIntoView({ behavior: behavior || "smooth", block: "start" });
 }
 
 function renderTrail() {
@@ -741,19 +851,23 @@ function renderTrail() {
   }
 
   const items = state.history
-    .map((item) => {
+    .map((item, i) => {
       const node = TREE[item.nodeId];
       const tag = item.answer === "yes" ? "Yes" : "No";
       return `<li class="trail-item">
-      <span class="trail-topic">${esc(node.shortLabel)}</span>
-      <span class="trail-tag trail-tag--${item.answer}">${tag}</span>
+      <button class="trail-link" onclick="goBackTo(${i})"
+        title="Change this answer"
+        aria-label="Go back to: ${esc(node.shortLabel)}">
+        <span class="trail-topic">${esc(node.shortLabel)}</span>
+        <span class="trail-tag trail-tag--${item.answer}">${tag}</span>
+      </button>
     </li>`;
     })
     .join("");
 
   trail.innerHTML = `
     <ol class="trail-items">${items}</ol>
-    <button class="trail-restart" onclick="restart()" aria-label="Start over">&#8592; Start over</button>`;
+    <button class="trail-restart" onclick="restart()" aria-label="Start over">&#8634; Start over</button>`;
 }
 
 function renderStage() {
@@ -774,9 +888,16 @@ function renderStage() {
 }
 
 function buildQuestion(node, nodeId) {
+  const backBtn =
+    state.history.length > 0
+      ? `<button class="btn-back" onclick="goBack()" aria-label="Go back one step">&#8592; Back</button>`
+      : "";
   return `
     <div class="node-card">
-      <span class="q-step-label">Step ${state.history.length + 1}</span>
+      <div class="q-topbar">
+        <span class="q-step-label">Step ${state.history.length + 1}</span>
+        ${backBtn}
+      </div>
       <h2 class="q-question">${esc(node.question)}</h2>
       <p class="q-explanation">${ic(node.explanation)}</p>
       <div class="yn-group" role="group" aria-label="Yes or No">
@@ -834,7 +955,11 @@ function buildResult(node) {
       </div>
 
       ${noteHtml}
-      <button class="btn-restart" onclick="restart()">&#8592; Start over</button>
+      <div class="result-actions">
+        <button class="btn-share" onclick="copyFlowLink(this)">Copy link to this recipe</button>
+        <button class="btn-back" onclick="goBack()" aria-label="Go back one step">&#8592; Back</button>
+        <button class="btn-restart" onclick="restart()">&#8634; Start over</button>
+      </div>
     </div>`;
 }
 
@@ -844,22 +969,67 @@ function choose(nodeId, answer) {
   const node = TREE[nodeId];
   state.history.push({ nodeId, answer });
   state.current = answer === "yes" ? node.yes.next : node.no.next;
+  syncUrl();
   render();
-  setTimeout(() => {
-    document
-      .getElementById("tree-stage")
-      .scrollIntoView({ behavior: "smooth", block: "start" });
-  }, 50);
+  setTimeout(() => scrollToStage(), 50);
 }
 
 function restart() {
   state = { history: [], current: "start" };
+  syncUrl();
   render();
-  setTimeout(() => {
-    document
-      .getElementById("tree-stage")
-      .scrollIntoView({ behavior: "smooth", block: "start" });
-  }, 50);
+  setTimeout(() => scrollToStage(), 50);
+}
+
+// undo the most recent answer and re-ask that question
+function goBack() {
+  goBackTo(state.history.length - 1);
+}
+
+// rewind to the question at trail position i (0-based); the answers
+// after it are discarded so the path can be rebuilt from there
+function goBackTo(i) {
+  if (i < 0 || i >= state.history.length) return;
+  const target = state.history[i].nodeId;
+  state.history = state.history.slice(0, i);
+  state.current = target;
+  syncUrl();
+  render();
+  setTimeout(() => scrollToStage(), 50);
+}
+
+function copyFlowLink(btn) {
+  if (btn.classList.contains("copied")) return;
+  const url = flowUrl();
+  const label = btn.textContent;
+  const done = () => {
+    btn.textContent = "Link copied";
+    btn.classList.add("copied");
+    setTimeout(() => {
+      btn.textContent = label;
+      btn.classList.remove("copied");
+    }, 1800);
+  };
+  navigator.clipboard
+    .writeText(url)
+    .then(done)
+    .catch(() => {
+      // clipboard api unavailable: fall back to a hidden textarea
+      const ta = document.createElement("textarea");
+      ta.value = url;
+      ta.setAttribute("readonly", "");
+      ta.style.position = "absolute";
+      ta.style.left = "-9999px";
+      document.body.appendChild(ta);
+      ta.select();
+      try {
+        document.execCommand("copy");
+        done();
+      } catch (e) {
+        // leave the url selected so the user can copy manually
+      }
+      document.body.removeChild(ta);
+    });
 }
 
 function copyCode(btn) {
@@ -885,4 +1055,26 @@ function copyCode(btn) {
 
 // init
 
-document.addEventListener("DOMContentLoaded", render);
+document.addEventListener("DOMContentLoaded", () => {
+  const rawHash = location.hash.replace(/^#/, "");
+  state = stateFromUrl();
+  if (rawHash && state.current === "start") {
+    // unknown slug: drop it so the address bar matches the fresh start
+    try {
+      history.replaceState(null, "", location.pathname + location.search);
+    } catch (e) {
+      // ignore; the stale hash is harmless
+    }
+  }
+  render();
+  if (state.current !== "start") {
+    // jump straight to the shared step without animated scrolling
+    const root = document.documentElement;
+    root.style.scrollBehavior = "auto";
+    scrollToStage("auto");
+    root.style.scrollBehavior = "";
+  }
+});
+
+window.addEventListener("popstate", applyUrl);
+window.addEventListener("hashchange", applyUrl);

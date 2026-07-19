@@ -6,20 +6,27 @@
 #' methods section to explain and justify their subset selection. The
 #' text references the structural constraints (endpoints, interior
 #' gaps, span length), frames the choice as a coverage-vs-sample-size
-#' trade-off, and optionally cites the package. A scenario that retains
-#' no respondents cannot be justified and raises a classed error
+#' trade-off, and, unless disabled, appends an in-text citation whose
+#' author and year are derived automatically from the package's own
+#' citation metadata (`utils::citation()`). A scenario that retains no
+#' respondents cannot be justified and raises a classed error
 #' (`weasel_error_empty_scenario`).
 #'
 #' @param plan_obj Object returned by [weasel_plan()].
 #' @param scenario Name (or unambiguous abbreviation) of the scenario.
 #' @param style One of `"methods"` (full methods-section paragraph),
-#'   `"concise"` (short summary), or `"extended"` (detailed rationale
-#'   including sensitivity framing).
-#' @param cite If `TRUE`, append a citation reference.
-#' @param author Optional author string for the citation (e.g.
-#'   `"van den Bosch"`).
-#' @param year Optional year string for the citation.
-#' @param package Package name used in the fallback citation.
+#'   `"concise"` (short summary), or `"extended"` (detailed
+#'   rationale).
+#' @param cite If `TRUE`, append an in-text citation. The author and
+#'   year are filled in automatically from the package's citation
+#'   metadata; a plain `(R package <name>)` reference is used only
+#'   when that metadata is unavailable.
+#' @param author Optional author string overriding the automatically
+#'   derived citation author.
+#' @param year Optional year string overriding the automatically
+#'   derived citation year.
+#' @param package Package whose citation metadata is used, and the
+#'   name shown in the fallback reference.
 #' @param acronym Acronym for the framework.
 #' @param full_name Full name of the framework.
 #' @param digits Number of decimal places for numeric values.
@@ -30,13 +37,15 @@
 #' d <- generate_weasel_dummy_data(n_ids = 200, n_times = 10, seed = 1)
 #' p <- weasel_plan(d, "id", "time", span = "core")
 #'
+#' # the in-text citation (package author and year) is automatic
 #' cat(weasel_justify_subset(p, "anchored_balanced"), "\n")
 #' cat(weasel_justify_subset(p, "anchored_strict", style = "concise"), "\n")
 #' cat(weasel_justify_subset(p, "anchored_balanced", style = "extended"), "\n")
 #'
-#' # with author citation
+#' # override the derived citation, or omit it entirely
 #' cat(weasel_justify_subset(p, "anchored_balanced",
-#'                           author = "van den Bosch", year = "2026"), "\n")
+#'                           author = "Custom Name", year = "2030"), "\n")
+#' cat(weasel_justify_subset(p, "anchored_balanced", cite = FALSE), "\n")
 #'
 #' @export
 weasel_justify_subset <- function(plan_obj,
@@ -158,6 +167,13 @@ weasel_justify_subset <- function(plan_obj,
 
   cite_txt <- ""
   if (isTRUE(cite)) {
+    # fill in whatever the caller did not supply from the package's own
+    # citation metadata, so the reference is automatic by default
+    if (is.null(author) || is.null(year)) {
+      meta <- .weasel_citation_meta(package)
+      if (is.null(author)) author <- meta$author
+      if (is.null(year))   year   <- meta$year
+    }
     if (!is.null(author) && !is.null(year)) {
       cite_txt <- sprintf(" (%s, %s)", author, year)
     } else if (!is.null(author)) {
@@ -283,4 +299,33 @@ weasel_justify_subset <- function(plan_obj,
 .collapse_parts <- function(parts) {
   parts <- parts[!is.na(parts) & nzchar(parts)]
   paste(parts, collapse = " ")
+}
+
+# in-text citation author and year from the package's own citation
+# metadata; NULL fields when the metadata is unavailable, in which case
+# the caller falls back to the plain package reference
+#' @noRd
+.weasel_citation_meta <- function(package) {
+  out <- list(author = NULL, year = NULL)
+  entry <- tryCatch(
+    unclass(utils::citation(package))[[1L]],
+    error = function(e) NULL
+  )
+  if (is.null(entry)) return(out)
+  fam <- tryCatch(
+    vapply(entry$author,
+           function(p) paste(p$family, collapse = " "), character(1)),
+    error = function(e) character(0)
+  )
+  fam <- fam[!is.na(fam) & nzchar(fam)]
+  if (length(fam) == 1) {
+    out$author <- fam
+  } else if (length(fam) == 2) {
+    out$author <- paste(fam, collapse = " & ")
+  } else if (length(fam) > 2) {
+    out$author <- paste0(fam[1L], " et al.")
+  }
+  yr <- tryCatch(as.character(entry$year), error = function(e) NULL)
+  if (length(yr) == 1 && !is.na(yr) && nzchar(yr)) out$year <- yr
+  out
 }

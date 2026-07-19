@@ -261,6 +261,23 @@ a:hover { text-decoration: underline; }
 
 .trail-item { display: inline-flex; align-items: center; gap: .4rem; }
 
+/* trail entries are buttons: click one to go back and change that answer */
+.trail-link {
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  background: none;
+  border: 0;
+  margin: 0;
+  padding: .05em .15em;
+  font: inherit;
+  cursor: pointer;
+  border-radius: var(--radius-inline);
+}
+
+.trail-link:hover .trail-topic { color: var(--primary); text-decoration: underline; }
+.trail-link:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+
 .trail-item:not(:first-child)::before {
   content: "\203A";
   margin-right: .25rem;
@@ -325,6 +342,31 @@ a:hover { text-decoration: underline; }
   margin-bottom: .7rem;
   display: block;
 }
+
+/* step label + back button on one line */
+.q-topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: .7rem;
+}
+
+.q-topbar .q-step-label { margin-bottom: 0; }
+
+/* back button (outline, same family as restart) */
+.btn-back {
+  font-family: var(--font-sans);
+  font-size: .95rem;
+  color: var(--ink-2);
+  background: var(--white);
+  border: 1px solid var(--border-2);
+  border-radius: var(--radius);
+  padding: .45em 1.1em;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.btn-back:hover { color: var(--white); background: var(--primary); border-color: var(--primary); }
 
 .q-question {
   font-family: var(--font-serif);
@@ -567,6 +609,30 @@ a:hover { text-decoration: underline; }
 }
 
 .note-icon { display: none; }
+
+/* result actions: share the recipe link or start over */
+.result-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .6rem;
+}
+
+.btn-share {
+  font-family: var(--font-sans);
+  font-size: .95rem;
+  color: var(--white);
+  background: var(--primary);
+  border: 1px solid var(--primary);
+  border-radius: var(--radius);
+  padding: .45em 1.1em;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.btn-share:hover { background: var(--primary-d); border-color: var(--primary-d); }
+
+.btn-share.copied { background: var(--green); border-color: var(--green); }
 
 /* restart button (outline) */
 .btn-restart {
