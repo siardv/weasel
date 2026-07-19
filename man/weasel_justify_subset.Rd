@@ -23,17 +23,22 @@ weasel_justify_subset(
 \item{scenario}{Name (or unambiguous abbreviation) of the scenario.}
 
 \item{style}{One of \code{"methods"} (full methods-section paragraph),
-\code{"concise"} (short summary), or \code{"extended"} (detailed rationale
-including sensitivity framing).}
+\code{"concise"} (short summary), or \code{"extended"} (detailed
+rationale).}
 
-\item{cite}{If \code{TRUE}, append a citation reference.}
+\item{cite}{If \code{TRUE}, append an in-text citation. The author and
+year are filled in automatically from the package's citation
+metadata; a plain \code{(R package <name>)} reference is used only
+when that metadata is unavailable.}
 
-\item{author}{Optional author string for the citation (e.g.
-\code{"van den Bosch"}).}
+\item{author}{Optional author string overriding the automatically
+derived citation author.}
 
-\item{year}{Optional year string for the citation.}
+\item{year}{Optional year string overriding the automatically
+derived citation year.}
 
-\item{package}{Package name used in the fallback citation.}
+\item{package}{Package whose citation metadata is used, and the
+name shown in the fallback reference.}
 
 \item{acronym}{Acronym for the framework.}
 
@@ -49,20 +54,24 @@ Produces a plain-text paragraph that researchers can paste into a
 methods section to explain and justify their subset selection. The
 text references the structural constraints (endpoints, interior
 gaps, span length), frames the choice as a coverage-vs-sample-size
-trade-off, and optionally cites the package. A scenario that retains
-no respondents cannot be justified and raises a classed error
+trade-off, and, unless disabled, appends an in-text citation whose
+author and year are derived automatically from the package's own
+citation metadata (\code{utils::citation()}). A scenario that retains no
+respondents cannot be justified and raises a classed error
 (\code{weasel_error_empty_scenario}).
 }
 \examples{
 d <- generate_weasel_dummy_data(n_ids = 200, n_times = 10, seed = 1)
 p <- weasel_plan(d, "id", "time", span = "core")
 
+# the in-text citation (package author and year) is automatic
 cat(weasel_justify_subset(p, "anchored_balanced"), "\n")
 cat(weasel_justify_subset(p, "anchored_strict", style = "concise"), "\n")
 cat(weasel_justify_subset(p, "anchored_balanced", style = "extended"), "\n")
 
-# with author citation
+# override the derived citation, or omit it entirely
 cat(weasel_justify_subset(p, "anchored_balanced",
-                          author = "van den Bosch", year = "2026"), "\n")
+                          author = "Custom Name", year = "2030"), "\n")
+cat(weasel_justify_subset(p, "anchored_balanced", cite = FALSE), "\n")
 
 }

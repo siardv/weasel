@@ -18,12 +18,24 @@ test_that("justification text is a single string with key figures", {
   }, character(1))
   expect_equal(length(unique(outs)), 3)
 
-  # citation handling
+  # citation handling: author and year are derived automatically from
+  # the package's citation metadata
+  auto <- weasel_justify_subset(p, "anchored_balanced")
+  expect_match(auto, "(van den Bosch, ", fixed = TRUE)
+  expect_false(grepl("R package weasel", auto, fixed = TRUE))
+
+  # explicit author/year override the derived values
   with_author <- weasel_justify_subset(p, "anchored_balanced",
                                        author = "Doe", year = "2026")
   expect_match(with_author, "(Doe, 2026)", fixed = TRUE)
+
+  # a partial override keeps the derived value for the other field
+  with_year <- weasel_justify_subset(p, "anchored_balanced", year = "2030")
+  expect_match(with_year, "(van den Bosch, 2030)", fixed = TRUE)
+
   no_cite <- weasel_justify_subset(p, "anchored_balanced", cite = FALSE)
   expect_false(grepl("R package weasel", no_cite, fixed = TRUE))
+  expect_false(grepl("van den Bosch", no_cite, fixed = TRUE))
 
   expect_error(weasel_justify_subset(p, "nonexistent"), "not found")
 })
