@@ -4,12 +4,28 @@
 [![R-CMD-check](https://github.com/siardv/weasel/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/siardv/weasel/actions/workflows/R-CMD-check.yaml)
 <!-- badges: end -->
 
-Wave-based Extraction and Selection for Longitudinal Data.
+**`weasel` turns wave-and-respondent selection in longitudinal panels into an explicit, reproducible workflow.**
 
-Tools for selecting, filtering, and balancing longitudinal panel data
-across survey waves. A respondent counts as observed at a wave when a
-row with that (id, wave) pair exists in the long-format data; a missed
-wave is an absent row.
+**Workflow guide:** <https://siardv.github.io/weasel/>
+
+Longitudinal analyses rarely use every respondent at every wave, and the
+selection step (which waves, which respondents, how much missingness to
+tolerate) usually ends up as a few undocumented lines of filtering code.
+`weasel` (Wave-based Extraction and Selection for Longitudinal Data)
+makes that step explicit:
+
+- **Explore.** `set_weasel_scope()` gives interactive access to wave
+  patterns, gaps, and completeness.
+- **Plan.** `weasel_plan()` turns selection rules into named,
+  comparable scenarios.
+- **Audit.** `weasel_sensitivity()` and `weasel_selectivity()` show
+  what each scenario costs and whom it excludes.
+- **Justify.** `weasel_apply()` extracts the analysis sample;
+  `weasel_justify_subset()` drafts the written rationale.
+
+One structural convention drives everything: a respondent is observed
+at a wave when a row with that `(id, wave)` pair exists in the
+long-format data; a missed wave is an absent row.
 
 > **Repository history note:** Some early, pre-`v0.3.1` development
 > history was consolidated while the repository workflow was being refined.
