@@ -5,15 +5,16 @@ Version: 0.4.0
 Authors@R:
     person("Siard", "van den Bosch", , "siardvandenbosch@me.com",
            role = c("aut", "cre", "cph"))
-Description: Tools for selecting, filtering, and balancing longitudinal
-    panel data across survey waves. Provides a scope-based pipeline for
-    wave pattern analysis and a planning interface for scenario-based
-    respondent selection with configurable missingness tolerances,
-    interior-gap constraints, and endpoint requirements. Wave grids may
-    be consecutive integers or the observed schedule (e.g. biennial
-    panels). Includes tolerance-sensitivity and attrition-selectivity
-    diagnostics, plus a generator of ready-to-paste methods-section
-    justification text.
+Description: Turns wave-and-respondent selection in longitudinal panels
+    into an explicit, reproducible workflow. Provides a scope-based
+    pipeline for wave pattern analysis and a planning interface for
+    scenario-based respondent selection with configurable missingness
+    tolerances, interior-gap constraints, and endpoint requirements.
+    Wave grids may be consecutive integers or the observed schedule
+    (e.g. biennial panels). Includes tolerance-sensitivity and
+    attrition-selectivity diagnostics, plus a generator of
+    ready-to-paste methods-section justification text. A full workflow
+    guide is available at <https://siardv.github.io/weasel/>.
 License: MIT + file LICENSE
 URL: https://github.com/siardv/weasel, https://siardv.github.io/weasel/
 BugReports: https://github.com/siardv/weasel/issues
