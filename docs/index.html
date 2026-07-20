@@ -16,7 +16,9 @@
     <div class="container">
       <div class="header-inner">
         <div class="brand">
-          <span class="brand-name">weasel</span>
+          <a class="brand-name" href="https://github.com/siardv/weasel"
+             target="_blank" rel="noopener noreferrer"
+             aria-label="weasel repository on GitHub">weasel</a>
           <span class="brand-version">v0.4.0</span>
         </div>
         <div class="brand-full">Wave-based Extraction and Selection for Longitudinal Data</div>
@@ -75,6 +77,188 @@
               <span class="pip-desc"><strong>Comparative.</strong> Enforce explicit constraints, score trade-offs, and extract a reproducible sample.</span>
             </div>
           </div>
+        </div>
+      </div>
+
+      <!-- concept figures: the vocabulary, drawn in the package's own notation -->
+      <div class="concept-band">
+        <h2 class="ov-heading">Reading participation patterns</h2>
+        <p class="concept-lede">
+          The figures below use the notation of weasel's own pattern tables: a number is an
+          observed wave (a row exists in the long data), a dot is a missed wave (the row is
+          simply absent).
+        </p>
+
+        <div class="concept-grid">
+
+          <figure class="concept-fig">
+            <figcaption class="fig-title">Observed and missed waves</figcaption>
+            <div class="fig-canvas" role="img"
+                 aria-label="One respondent across eight waves. Waves 1, 2, 3, 5, 6, and 8 are observed; waves 4 and 7 are shown as dots because no row exists for them.">
+              <div class="wave-row">
+                <span class="wave-cell on">1</span>
+                <span class="wave-cell on">2</span>
+                <span class="wave-cell on">3</span>
+                <span class="wave-cell off">&middot;</span>
+                <span class="wave-cell on">5</span>
+                <span class="wave-cell on">6</span>
+                <span class="wave-cell off">&middot;</span>
+                <span class="wave-cell on">8</span>
+              </div>
+            </div>
+            <p class="fig-caption">
+              Wave-level missingness is row absence: waves 4 and 7 are not <code>NA</code>
+              rows, they simply do not exist in the data. <code>NA</code> values inside
+              observed rows are item nonresponse and never affect selection.
+            </p>
+          </figure>
+
+          <figure class="concept-fig">
+            <figcaption class="fig-title">Span and grid</figcaption>
+            <div class="fig-canvas" role="img"
+                 aria-label="Two wave axes. First, ten consecutive waves with a bracket marking span 4 to 9, six waves long. Second, a biennial schedule from 2008 to 2018 with a bracket marking span 2010 to 2016, four observed waves; odd years do not appear on the axis at all.">
+              <div class="fig-rowlabel"><code>grid = "consecutive"</code></div>
+              <div class="span-wrap">
+                <div class="span-bracket" style="--s: 3; --n: 6;">
+                  <span class="bracket-label">span 4:9 (L = 6)</span>
+                  <span class="bracket-line"></span>
+                </div>
+                <div class="wave-row axis">
+                  <span class="wave-cell dim">1</span>
+                  <span class="wave-cell dim">2</span>
+                  <span class="wave-cell dim">3</span>
+                  <span class="wave-cell sched">4</span>
+                  <span class="wave-cell sched">5</span>
+                  <span class="wave-cell sched">6</span>
+                  <span class="wave-cell sched">7</span>
+                  <span class="wave-cell sched">8</span>
+                  <span class="wave-cell sched">9</span>
+                  <span class="wave-cell dim">10</span>
+                </div>
+              </div>
+              <div class="fig-rowlabel"><code>grid = "observed"</code> (biennial)</div>
+              <div class="span-wrap years">
+                <div class="span-bracket" style="--s: 1; --n: 4;">
+                  <span class="bracket-label">span 2010:2016 (4 observed waves)</span>
+                  <span class="bracket-line"></span>
+                </div>
+                <div class="wave-row axis">
+                  <span class="wave-cell dim">2008</span>
+                  <span class="wave-cell sched">2010</span>
+                  <span class="wave-cell sched">2012</span>
+                  <span class="wave-cell sched">2014</span>
+                  <span class="wave-cell sched">2016</span>
+                  <span class="wave-cell dim">2018</span>
+                </div>
+              </div>
+            </div>
+            <p class="fig-caption">
+              The span is the analysis window, <code>lower:upper</code>. The grid decides
+              which waves inside it count as scheduled: every integer
+              (<code>"consecutive"</code>) or only wave values that occur in the data
+              (<code>"observed"</code>), so 2011 is never a missed wave in a biennial panel.
+            </p>
+          </figure>
+
+          <figure class="concept-fig">
+            <figcaption class="fig-title">Endpoints and interior gaps</figcaption>
+            <div class="fig-canvas" role="img"
+                 aria-label="Two respondents in a span of waves 1 to 7; small markers point at waves 1 and 7, the endpoints. The first respondent is observed at waves 3, 4, and 5 only: late entry and early exit, no interior gap, both endpoints missed. The second is observed at 1, 2, 5, 6, and 7: both endpoints present and one interior gap of length 2 at waves 3 and 4.">
+              <div class="wave-row ticks">
+                <span class="wave-cell tick">&#9662;</span>
+                <span class="wave-cell tick"></span>
+                <span class="wave-cell tick"></span>
+                <span class="wave-cell tick"></span>
+                <span class="wave-cell tick"></span>
+                <span class="wave-cell tick"></span>
+                <span class="wave-cell tick">&#9662;</span>
+              </div>
+              <div class="wave-row">
+                <span class="wave-cell off">&middot;</span>
+                <span class="wave-cell off">&middot;</span>
+                <span class="wave-cell on">3</span>
+                <span class="wave-cell on">4</span>
+                <span class="wave-cell on">5</span>
+                <span class="wave-cell off">&middot;</span>
+                <span class="wave-cell off">&middot;</span>
+              </div>
+              <div class="brace-row">
+                <div class="under-brace" style="--s: 0; --n: 2;">
+                  <span class="bracket-line up"></span>
+                  <span class="bracket-label">entry</span>
+                </div>
+                <div class="under-brace" style="--s: 5; --n: 2;">
+                  <span class="bracket-line up"></span>
+                  <span class="bracket-label">exit</span>
+                </div>
+              </div>
+              <div class="wave-row">
+                <span class="wave-cell on">1</span>
+                <span class="wave-cell on">2</span>
+                <span class="wave-cell off">&middot;</span>
+                <span class="wave-cell off">&middot;</span>
+                <span class="wave-cell on">5</span>
+                <span class="wave-cell on">6</span>
+                <span class="wave-cell on">7</span>
+              </div>
+              <div class="brace-row">
+                <div class="under-brace" style="--s: 2; --n: 2;">
+                  <span class="bracket-line up"></span>
+                  <span class="bracket-label">gap (length 2)</span>
+                </div>
+              </div>
+            </div>
+            <p class="fig-caption">
+              An interior gap is a run of missing waves strictly between a respondent's
+              first and last observed wave. The top row misses both endpoints
+              (<span class="tick-inline">&#9662;</span>) yet contains no gap; the bottom
+              row keeps both endpoints and has exactly one gap of length 2.
+            </p>
+          </figure>
+
+          <figure class="concept-fig">
+            <figcaption class="fig-title">Constraints select the subset</figcaption>
+            <div class="fig-canvas" role="img"
+                 aria-label="Four respondents over waves 1 to 7 under the anchored_balanced scenario: endpoints required, at most one missing wave, at most one gap no longer than one wave. A fully observed respondent is kept. A respondent missing only wave 3 is kept. A respondent missing waves 3 and 4 is dropped for a gap of length 2. A respondent missing wave 1 is dropped for a missed endpoint. Two of four are retained.">
+              <div class="scenario-line">
+                <code>require_endpoints</code> <code>max_missing = 1</code>
+                <code>n_gap_max = 1</code> <code>max_gap_len = 1</code>
+              </div>
+              <div class="panel-row">
+                <div class="wave-row">
+                  <span class="wave-cell on">1</span><span class="wave-cell on">2</span><span class="wave-cell on">3</span><span class="wave-cell on">4</span><span class="wave-cell on">5</span><span class="wave-cell on">6</span><span class="wave-cell on">7</span>
+                </div>
+                <span class="verdict keep">&#10003; kept</span>
+              </div>
+              <div class="panel-row">
+                <div class="wave-row">
+                  <span class="wave-cell on">1</span><span class="wave-cell on">2</span><span class="wave-cell off">&middot;</span><span class="wave-cell on">4</span><span class="wave-cell on">5</span><span class="wave-cell on">6</span><span class="wave-cell on">7</span>
+                </div>
+                <span class="verdict keep">&#10003; kept</span>
+              </div>
+              <div class="panel-row">
+                <div class="wave-row">
+                  <span class="wave-cell on">1</span><span class="wave-cell on">2</span><span class="wave-cell off">&middot;</span><span class="wave-cell off">&middot;</span><span class="wave-cell on">5</span><span class="wave-cell on">6</span><span class="wave-cell on">7</span>
+                </div>
+                <span class="verdict drop">&#10007; gap of 2</span>
+              </div>
+              <div class="panel-row">
+                <div class="wave-row">
+                  <span class="wave-cell off">&middot;</span><span class="wave-cell on">2</span><span class="wave-cell on">3</span><span class="wave-cell on">4</span><span class="wave-cell on">5</span><span class="wave-cell on">6</span><span class="wave-cell on">7</span>
+                </div>
+                <span class="verdict drop">&#10007; endpoint missed</span>
+              </div>
+              <div class="pop-line">
+                planning population 4 &#8594; retained 2 (retention 0.50)
+              </div>
+            </div>
+            <p class="fig-caption">
+              The built-in <code>anchored_balanced</code> scenario applied to four
+              respondents observed in the span (the planning population). Retention is
+              always reported against that denominator, here 2 of 4.
+            </p>
+          </figure>
+
         </div>
       </div>
 

@@ -100,6 +100,21 @@ a:hover { text-decoration: underline; }
   letter-spacing: 0;
 }
 
+/* the brand is a link to the repository; quiet affordance, same look */
+a.brand-name { text-decoration: none; }
+
+a.brand-name:hover {
+  color: var(--white);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: .18em;
+}
+
+a.brand-name:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, .7);
+  outline-offset: 3px;
+}
+
 .brand-version {
   font-family: var(--font-mono);
   font-size: .78rem;
@@ -649,6 +664,211 @@ a:hover { text-decoration: underline; }
 
 .btn-restart:hover { color: var(--white); background: var(--primary); border-color: var(--primary); }
 
+/* ─── CONCEPT FIGURES (about band) ──────────────────────────── */
+
+.concept-band { margin: 2rem 0 2.2rem; }
+
+.concept-lede {
+  font-size: 1.02rem;
+  color: var(--ink-2);
+  line-height: 1.5;
+  margin: .1rem 0 1rem;
+  max-width: 640px;
+}
+
+.concept-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.concept-fig {
+  margin: 0;
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem 1.1rem .95rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.fig-title {
+  font-family: var(--font-sans);
+  font-size: .76rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--ink-3);
+  margin-bottom: .75rem;
+}
+
+.fig-canvas { --wcell: 1.7rem; --wgap: .22rem; overflow-x: auto; }
+
+.fig-caption {
+  font-size: .95rem;
+  color: var(--ink-2);
+  line-height: 1.45;
+  margin-top: .75rem;
+}
+
+.fig-rowlabel {
+  font-family: var(--font-sans);
+  font-size: .78rem;
+  color: var(--ink-3);
+  margin: .1rem 0 .3rem;
+}
+
+/* wave cells: the package's pattern notation, drawn */
+.wave-row { display: flex; gap: var(--wgap); }
+
+.wave-cell {
+  flex: 0 0 var(--wcell);
+  width: var(--wcell);
+  height: var(--wcell);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: .74rem;
+  border-radius: var(--radius-inline);
+  box-sizing: border-box;
+}
+
+/* observed: a row exists */
+.wave-cell.on {
+  background: #e7f0fb;
+  border: 1px solid #d3e3f8;
+  color: var(--ink);
+}
+
+/* missed: the row is absent (dashed border, not color-only) */
+.wave-cell.off {
+  background: var(--gray-100);
+  border: 1px dashed var(--gray-400);
+  color: var(--gray-500);
+}
+
+/* schedule axis (fig: span and grid); no observation semantics */
+.wave-cell.sched {
+  background: var(--white);
+  border: 1px solid var(--border-2);
+  color: var(--ink-2);
+}
+
+.wave-cell.dim {
+  background: var(--gray-100);
+  border: 1px solid var(--gray-200);
+  color: var(--gray-500);
+}
+
+/* wider cells for year labels */
+.span-wrap.years { --wcell: 2.55rem; }
+.span-wrap.years .wave-cell { height: 1.7rem; font-size: .7rem; }
+
+.span-wrap { margin-bottom: .55rem; }
+
+/* endpoint ticks above a row */
+.wave-row.ticks { margin-bottom: .1rem; }
+.wave-cell.tick {
+  height: .8rem;
+  background: none;
+  border: none;
+  color: var(--gray-600);
+  font-size: .68rem;
+  line-height: 1;
+}
+.tick-inline { color: var(--gray-600); font-size: .8em; }
+
+/* span bracket above an axis row */
+.span-bracket {
+  margin-left: calc(var(--s) * (var(--wcell) + var(--wgap)));
+  width: calc(var(--n) * var(--wcell) + (var(--n) - 1) * var(--wgap));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: .15rem;
+}
+
+.bracket-label {
+  font-family: var(--font-sans);
+  font-size: .68rem;
+  color: var(--ink-3);
+  white-space: nowrap;
+  padding-bottom: .12rem;
+}
+
+/* the bracket line: horizontal rule with short drops toward the cells */
+.bracket-line {
+  position: relative;
+  width: 100%;
+  border-top: 1px solid var(--gray-500);
+  height: 4px;
+}
+.bracket-line::before,
+.bracket-line::after {
+  content: "";
+  position: absolute;
+  top: -1px;
+  height: 4px;
+  border-left: 1px solid var(--gray-500);
+}
+.bracket-line::before { left: 0; }
+.bracket-line::after { right: 0; }
+
+/* inverted variant: drops point up, used below a row */
+.bracket-line.up { border-top: none; border-bottom: 1px solid var(--gray-500); }
+.bracket-line.up::before,
+.bracket-line.up::after { top: 1px; }
+
+/* annotations below a row (entry/exit, gap length) */
+.brace-row { position: relative; height: 1.35rem; margin: .1rem 0 .45rem; }
+
+.under-brace {
+  position: absolute;
+  left: calc(var(--s) * (var(--wcell) + var(--wgap)));
+  width: calc(var(--n) * var(--wcell) + (var(--n) - 1) * var(--wgap));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.under-brace .bracket-label { padding: .1rem 0 0; }
+
+/* constraints figure */
+.scenario-line {
+  font-family: var(--font-sans);
+  font-size: .78rem;
+  color: var(--ink-3);
+  display: flex;
+  flex-wrap: wrap;
+  gap: .3rem .45rem;
+  margin-bottom: .6rem;
+}
+
+.panel-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: .2rem .5rem;
+  margin-bottom: .3rem;
+}
+
+.verdict {
+  font-family: var(--font-sans);
+  font-size: .78rem;
+  white-space: nowrap;
+}
+.verdict.keep { color: #2f8a13; }
+.verdict.drop { color: var(--gray-600); }
+
+.pop-line {
+  font-family: var(--font-sans);
+  font-size: .8rem;
+  color: var(--ink-2);
+  border-top: 1px solid var(--gray-200);
+  margin-top: .5rem;
+  padding-top: .45rem;
+}
+
 /* ─── FOOTER (.nav-footer gradient rule) ────────────────────── */
 
 .site-footer {
@@ -736,6 +956,10 @@ code {
 
 @media (max-width: 640px) {
   .container { padding: 0 1.15rem; }
+
+  .concept-grid { grid-template-columns: 1fr; }
+  .fig-canvas { --wcell: 1.55rem; }
+  .span-wrap.years { --wcell: 2.4rem; }
 
   .intro-headline { font-size: 2.1rem; }
 
