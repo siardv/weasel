@@ -240,11 +240,11 @@ head(subset1)`,
       },
       {
         fn: "weasel_filter_wave_summary(ids_range = c(5, Inf))",
-        note: "optional: show only patterns shared by at least 5 respondents",
+        note: "optional: keep only patterns shared by at least 5 respondents (`ids` counts respondents; `n` counts observed waves)",
       },
       {
-        fn: "weasel_get_data_by_row(i)",
-        note: "retrieve long-format data for the selected pattern row",
+        fn: "weasel_get_data_by_row(common$pattern[1])",
+        note: "extract by stable pattern id: `pattern` values survive filtering, so this is exactly the pattern inspected above, never a display row position",
       },
     ],
     code: `library(weasel)
@@ -256,20 +256,25 @@ evaluate_weasel_scope()
 weasel_reshape_to_wide()
 weasel_summarize_waves()
 
-weasel_print_table(
-  weasel_filter_wave_summary(ids_range = c(5, Inf)),
-  title = "Common patterns (n >= 5)"
-)
+common <- weasel_filter_wave_summary(ids_range = c(5, Inf))
+weasel_print_table(common, title = "Common patterns (ids >= 5)")
 
-subset1 <- weasel_get_data_by_row(1)`,
+if (nrow(common) > 0) {
+  subset1 <- weasel_get_data_by_row(common$pattern[1])
+}`,
     note:
       "`max_gap_len` and `n_gap_max` are enforced at reshape time inside the bounded window: " +
       "interior gaps are measured strictly between a respondent's first and last observed " +
       "wave within the span, so late entry and early exit never count as gaps. Respondents " +
-      "exceeding the limits are dropped with a status message. The same constraint names are " +
-      "used by plan scenario tables; to weigh several tolerances against each other before " +
-      "committing, use the Plan pipeline (`weasel_plan()` scenarios or " +
-      "`weasel_sensitivity()`).",
+      "exceeding the limits are dropped with a status message. Extraction goes through the " +
+      "stable `pattern` id of the named, filtered table (`common$pattern[1]`), not through a " +
+      "display row position: after filtering, row 1 of the visible table and pattern 1 of the " +
+      "full summary are different concepts, and the `nrow(common) > 0` guard makes the " +
+      "empty-filter case explicit instead of silently extracting an unrelated pattern. The " +
+      "filter is on `ids` (respondents sharing a pattern), not `n` (observed waves in the " +
+      "pattern). The same constraint names are used by plan scenario tables; to weigh several " +
+      "tolerances against each other before committing, use the Plan pipeline " +
+      "(`weasel_plan()` scenarios or `weasel_sensitivity()`).",
   },
 
   result_scope_learn: {

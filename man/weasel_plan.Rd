@@ -36,14 +36,26 @@ is stored in the returned \code{span_candidates} table) or \code{"full"}
 (all waves). Ignored when explicit \code{lower}/\code{upper} bounds are
 supplied; supplying both raises an error.}
 
-\item{core_len}{Integer; desired window length when \code{span = "core"}.}
+\item{core_len}{Integer; desired window length when \code{span = "core"}.
+Values outside the feasible range (below 2, or above the number of
+grid waves) are clamped to it, and the adjustment is reported in a
+verbose-mode message rather than applied silently.}
 
 \item{scenarios}{Optional data frame of custom scenarios with the
 columns \code{scenario}, \code{require_endpoints}, \code{max_missing},
 \code{n_gap_max}, \code{max_gap_len}. The table is validated; missing
 columns raise an error. The pre-0.4 column name \code{max_gap_max} is
 still accepted with a deprecation warning (class
-\code{weasel_deprecated}).}
+\code{weasel_deprecated}). Tolerance columns may arrive as numbers,
+numeric-looking character values, or factors; factors are
+converted through their displayed labels, never through their
+internal level codes, so a validated table always carries exactly
+the tolerances the user wrote. Uninterpretable, negative, or
+fractional values are rejected with an error naming the column
+and the offending value (\code{Inf} still means "no constraint").
+\code{require_endpoints} accepts logical values, the imported labels
+\code{"TRUE"}/\code{"FALSE"}/\code{"T"}/\code{"F"}, or the exact numbers 0/1; broader
+coercions such as \code{2} or \code{"yes"} are rejected.}
 
 \item{grid}{How the wave grid inside the span is defined.
 \code{"consecutive"} (default) treats every integer between the span
@@ -78,7 +90,12 @@ otherwise), \code{population} (the planning denominator: rows and
 distinct ids in the data, ids and unique pairs observed in the
 span; all retention proportions are relative to
 \code{"observed_in_span"}), \code{fingerprint} (a structural fingerprint of
-the data used to detect mismatched reunions later), \code{id}, and
+the data: aggregate counts plus an order-invariant digest of the
+deduplicated (id, wave) assignments, used to detect mismatched
+reunions later; the guard applies only when data are supplied
+explicitly to \code{\link[=weasel_apply]{weasel_apply()}}, \code{\link[=weasel_summarize_subset]{weasel_summarize_subset()}}, or
+\code{\link[=weasel_selectivity]{weasel_selectivity()}}, since the attached-data path cannot
+mismatch by construction), \code{id}, and
 \code{wave}. When \code{keep_data = TRUE} the original \code{data} is attached as
 an attribute. Printing the object shows a compact summary instead
 of the raw list.

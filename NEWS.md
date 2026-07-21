@@ -1,3 +1,119 @@
+# weasel 0.4.1
+
+A correctness release driven by an external adjustment report whose
+findings were independently reproduced before any change (and by a
+cross-examination of that report). Two defects could silently produce
+wrong analytical results; both are fixed with regression tests locked
+in before the fixes.
+
+## Fixes
+
+* Saved-plan data fingerprinting is now pair-level. The fingerprint
+  previously stored only aggregate counts, so two different panels
+  (for example with participation swapped between respondents) could
+  share a fingerprint, and a saved plan reunited with such data
+  returned respondents who no longer satisfy the scenario, without
+  any warning. Fingerprints now additionally carry an order-invariant
+  digest of the deduplicated (id, wave) assignments (built from a
+  canonical, locale-independent byte stream hashed with base R's
+  `tools::md5sum()`; the new `tools` import has base priority, so the
+  package remains dependency-free). All three reunion paths
+  (`weasel_apply()`, `weasel_summarize_subset()`,
+  `weasel_selectivity()`) compare it and warn (`weasel_data_mismatch`)
+  on any change to the incidence structure, with a message that
+  distinguishes count changes from pure assignment changes. Plans
+  saved by earlier versions carry no digest and keep their documented
+  acceptance behavior; the guard continues to apply only to explicitly
+  re-supplied data.
+* `weasel_summarize_subset()` no longer corrupts summaries for factor
+  ids with unused levels. Grouping previously went through `split()`
+  on the raw id column, so every unused factor level became a phantom
+  respondent with zero observed waves, deflating `mean_present`,
+  `endpoint_rate`, and `min_present` and inflating the missingness
+  distribution while `n_ids` stayed correct. Grouping now runs through
+  `match()` against the scenario's retained ids, making summaries
+  invariant to the id representation (character, factor, factor with
+  unused or reordered levels, integer); an internal denominator
+  assertion raises a classed error (`weasel_error_internal`) if the
+  grouped count ever disagrees with the plan.
+* Scenario-table tolerances supplied as factors are converted through
+  their displayed labels, never through internal level codes. A factor
+  tolerance column `c("0", "1")` previously became thresholds 1 and 2,
+  silently loosening the selection rules; it now stays 0 and 1, and
+  uninterpretable values are rejected with an error naming the column
+  and the offending value.
+
+## Validation hardening
+
+* `require_endpoints` is strictly validated in both entry points.
+  Scenario tables accept logicals, the imported labels
+  `"TRUE"`/`"FALSE"`/`"T"`/`"F"`, and the exact numbers 0/1; anything
+  else (for example `2`, previously coerced to `TRUE` by
+  `as.logical()`) is rejected. `weasel_sensitivity()` accepts actual
+  logical values only.
+* `generate_weasel_dummy_data()` validates all five probability
+  parameters (single numbers in [0, 1]), `attention_scale` (finite,
+  > 0), `attention_center` (finite), and `seed` (integer-valued)
+  before any random draw. Previously `prop_random = -1` was accepted
+  silently, `prop_item_missing = 2` made every outcome `NA`, and
+  `prop_attrition = 2` failed later inside base R's sampler with an
+  unrelated message.
+* `weasel_compare_scenarios()` enforces the documented scalar contract
+  for `tie_tolerance`: vectors (previously reduced to their first
+  element) and character values (previously converted silently) are
+  rejected.
+
+## Transparency
+
+* `core_len` values outside the feasible window range (below 2, or
+  above the number of grid waves) were already clamped into range, but
+  silently; the clamp is now reported in a verbose-mode message, in
+  line with the package's rule that no automatic decision is silent.
+  The clamped result itself is unchanged.
+
+## Documentation
+
+* The custom-scenarios prose in the advanced-usage vignette named the
+  deprecated `max_gap_max` as a required column while the adjacent
+  code correctly used `max_gap_len`; corrected.
+* The vignette's justification-styles section claimed the `extended`
+  style "adds sensitivity framing", which the generated text does not
+  contain; it now says the style adds a fuller design rationale, and
+  the section demonstrates the zero-argument automatic citation
+  alongside the existing `author`/`year` override.
+* `weasel_compare_scenarios()` documents that zero and negative
+  weights are accepted deliberately (a zero weight removes a term, a
+  negative weight inverts its direction).
+* README and the advanced-usage vignette describe the pair-level
+  reunion guard, including that it applies only to explicitly
+  re-supplied data.
+* Stale ignore entries referencing helper files that no longer exist
+  (`v3/`, `update_github_repo.sh`, `publish-weasel.sh`) removed from
+  `.Rbuildignore` and `.gitignore`.
+
+## Guide
+
+* The bounded-scope recipe now extracts through the stable pattern id
+  of a named, filtered table (`common$pattern[1]`) with an explicit
+  empty-table guard, instead of `weasel_get_data_by_row(1)` after
+  filtering, and its table title says `ids >= 5` (the filter is on
+  respondents per pattern, not on observed waves `n`). The recipe
+  notes teach the row-position versus stable-id distinction.
+* New semantic parity check in CI (`tools/check-guide-semantics.R`,
+  wired into the guide-snippets workflow): the pattern the bounded
+  recipe displays must equal the pattern it extracts, and the title
+  must label the filtered column correctly. Snippet execution alone
+  cannot detect that class of drift.
+
+## Infrastructure
+
+* New `release-coherence` workflow (on release publication and manual
+  dispatch, deliberately not on push): the released tag must have a
+  NEWS section, the current-version surfaces must agree, and the
+  latest-release endpoint may never be ahead of DESCRIPTION.
+* `.Rbuildignore` excludes the new `tools/` directory from the
+  package build.
+
 # weasel 0.4.0
 
 A consolidation release: corrections, honesty on imperfect input, one

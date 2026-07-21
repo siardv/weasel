@@ -6,6 +6,3 @@ doc/
 Meta/
 *.Rcheck/
 weasel_*.tar.gz
-publish-weasel.sh
-v3/
-update_github_repo.sh

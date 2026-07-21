@@ -16,7 +16,9 @@ weasel_sensitivity(
 \arguments{
 \item{plan_obj}{Object returned by \code{\link[=weasel_plan]{weasel_plan()}}.}
 
-\item{require_endpoints}{Logical values to evaluate.}
+\item{require_endpoints}{Logical values to evaluate. Must be actual
+logical \code{TRUE}/\code{FALSE} values; numeric or character stand-ins
+(for example \code{2} or \code{"TRUE"}) are rejected rather than coerced.}
 
 \item{max_missing}{Integer tolerances for missing waves in the span.}
 

@@ -8,7 +8,7 @@ authors:
     given-names: "Siard"
     email: "siardvandenbosch@me.com"
 license: MIT
-version: "0.4.0"
-date-released: "2026-07-11"
+version: "0.4.1"
+date-released: "2026-07-21"
 repository-code: "https://github.com/siardv/weasel"
 url: "https://siardv.github.io/weasel/"

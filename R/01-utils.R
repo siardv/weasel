@@ -87,6 +87,18 @@ the <- new.env(parent = emptyenv())
   as.integer(round(x))
 }
 
+# single probability in [0, 1]; the scalar sibling of
+# .weasel_check_count: exactly one finite numeric value, no NA, and the
+# error names the parameter and its required range
+.weasel_check_prob <- function(x, name) {
+  ok <- length(x) == 1 && is.numeric(x) && !is.na(x) && is.finite(x) &&
+    x >= 0 && x <= 1
+  if (!ok) {
+    .weasel_stop(name, " must be a single number in [0, 1].")
+  }
+  as.numeric(x)
+}
+
 # single integer bound (any sign) or NULL; strict: fractional values
 # are rejected rather than silently rounded
 .weasel_check_bound <- function(x, name) {
@@ -260,24 +272,70 @@ the <- new.env(parent = emptyenv())
     .weasel_stop("scenario names must be non-empty strings.")
   }
   if (anyDuplicated(s$scenario)) .weasel_stop("scenario names must be unique.")
-  s$require_endpoints <- as.logical(s$require_endpoints)
-  if (anyNA(s$require_endpoints)) {
-    .weasel_stop("scenario column 'require_endpoints' must not contain NA.")
-  }
+  s$require_endpoints <- .weasel_check_endpoint_flags(
+    s$require_endpoints, "scenario column 'require_endpoints'"
+  )
   for (nm in c("max_missing", "n_gap_max", "max_gap_len")) {
-    s[[nm]] <- suppressWarnings(as.numeric(s[[nm]]))
-    if (anyNA(s[[nm]])) {
+    raw <- s[[nm]]
+    # factors convert through their displayed labels, never through
+    # their internal level codes: factor("0", "1") means thresholds 0
+    # and 1, not 1 and 2
+    if (is.factor(raw)) raw <- as.character(raw)
+    if (anyNA(raw)) {
       .weasel_stop("scenario column '", nm, "' must not contain NA.")
     }
-    if (any(s[[nm]] < 0)) .weasel_stop("scenario column '", nm, "' must be >= 0.")
-    frac <- is.finite(s[[nm]]) & abs(s[[nm]] - round(s[[nm]])) > 1e-8
+    val <- suppressWarnings(as.numeric(raw))
+    bad <- is.na(val)
+    if (any(bad)) {
+      .weasel_stop("scenario column '", nm, "' contains value(s) not ",
+                   "interpretable as numbers: ",
+                   paste(unique(as.character(raw)[bad]), collapse = ", "),
+                   ". tolerances must be integer-valued numbers or Inf.")
+    }
+    if (any(val < 0)) .weasel_stop("scenario column '", nm, "' must be >= 0.")
+    frac <- is.finite(val) & abs(val - round(val)) > 1e-8
     if (any(frac)) {
       .weasel_stop("scenario column '", nm, "' must contain integer-valued ",
                    "tolerances or Inf (fractional values are rejected, ",
                    "not truncated).")
     }
+    s[[nm]] <- val
   }
   s
+}
+
+# strict endpoint-flag normalization shared by scenario tables: actual
+# logical values pass through; imported character or factor labels
+# "TRUE"/"FALSE"/"T"/"F" and exact numeric 0/1 are accepted so that
+# tables read from files keep working; everything else (2, "yes", "",
+# NA) is rejected instead of being coerced through as.logical()
+.weasel_check_endpoint_flags <- function(x, name = "require_endpoints") {
+  raw <- x
+  if (is.factor(raw)) raw <- as.character(raw)
+  out <- rep(NA, length(raw))
+  if (is.logical(raw)) {
+    out <- raw
+  } else if (is.character(raw)) {
+    out[!is.na(raw) & raw %in% c("TRUE", "T")]  <- TRUE
+    out[!is.na(raw) & raw %in% c("FALSE", "F")] <- FALSE
+  } else if (is.numeric(raw)) {
+    out[!is.na(raw) & raw == 1] <- TRUE
+    out[!is.na(raw) & raw == 0] <- FALSE
+  }
+  if (length(out) == 0 || anyNA(out)) {
+    offending <- unique(as.character(raw)[is.na(out)])
+    offending <- offending[!is.na(offending)]
+    .weasel_stop(
+      name, " must contain only logical values (TRUE/FALSE; the ",
+      "imported labels \"TRUE\"/\"FALSE\"/\"T\"/\"F\" and the exact ",
+      "numbers 0/1 are also accepted)",
+      if (length(offending) > 0) {
+        paste0("; offending value(s): ", paste(offending, collapse = ", "))
+      } else "",
+      "."
+    )
+  }
+  out
 }
 
 # run-length gap metrics over the full presence vector
@@ -381,8 +439,36 @@ the <- new.env(parent = emptyenv())
   invisible(plan_obj)
 }
 
+# order-invariant digest of the deduplicated (id, wave) assignments;
+# two panels share it exactly when they share the same incidence
+# structure, so aggregate-count collisions cannot slip past the guard.
+# the byte stream is canonical and locale-independent: ids as UTF-8
+# character, waves as integers, pairs radix-sorted (byte order, not
+# collation order), joined with unit/record separators under a
+# versioned prefix, and hashed with base R's tools::md5sum(). the
+# threat model is accidental drift, not adversarial collision, so md5
+# through a mature base implementation is appropriate and the package
+# stays dependency-free.
+.weasel_pair_hash <- function(ids_chr, waves_int) {
+  o <- order(ids_chr, waves_int, method = "radix")
+  stream <- paste0(
+    "weasel-fp-v1\x1e",
+    paste0(enc2utf8(ids_chr[o]), "\x1f", as.character(waves_int[o]),
+           collapse = "\x1e")
+  )
+  f <- tempfile("weasel-fp-")
+  on.exit(unlink(f), add = TRUE)
+  con <- file(f, open = "wb")
+  writeBin(charToRaw(enc2utf8(stream)), con)
+  close(con)
+  unname(tools::md5sum(f))
+}
+
 # structural fingerprint of a panel, cheap and order-invariant; used to
-# detect when a saved plan is reunited with data it was not built from
+# detect when a saved plan is reunited with data it was not built from.
+# the descriptive counts make mismatch warnings informative; pair_hash
+# (added in 0.4.1) digests the actual deduplicated (id, wave)
+# assignments, so swapped participation with identical counts is caught
 .weasel_data_fingerprint <- function(data, id, wave) {
   ok   <- !is.na(data[[id]]) & !is.na(data[[wave]])
   ids0 <- data[[id]][ok]
@@ -397,28 +483,50 @@ the <- new.env(parent = emptyenv())
     n_ids          = length(unique(idsu)),
     id_type        = class(data[[id]])[1],
     waves          = waves,
-    pairs_per_wave = as.integer(table(factor(wu, levels = waves)))
+    pairs_per_wave = as.integer(table(factor(wu, levels = waves))),
+    pair_hash      = .weasel_pair_hash(as.character(idsu), wu)
   )
 }
 
 # compare the stored fingerprint against explicitly supplied data and
 # warn on a structural mismatch; plans from older versions carry no
-# fingerprint and are accepted silently
+# fingerprint and are accepted silently. exactly the fields the stored
+# fingerprint carries are compared: legacy plans saved before 0.4.1
+# have no pair_hash and keep their documented acceptance behavior,
+# while new plans are additionally guarded by the pair digest
 .weasel_check_fingerprint <- function(plan_obj, data, id, wave) {
   fp <- plan_obj[["fingerprint"]]
   if (is.null(fp)) return(invisible(TRUE))
   now <- .weasel_data_fingerprint(data, id, wave)
+  now <- now[names(fp)]
   same <- identical(fp, now)
   if (!same) {
-    .weasel_warn(
-      "the supplied data do not structurally match the data this plan ",
-      "was built from (rows ", fp$n_rows, " -> ", now$n_rows,
-      ", unique (id, wave) pairs ", fp$n_pairs, " -> ", now$n_pairs,
-      ", distinct ids ", fp$n_ids, " -> ", now$n_ids, "). the plan's ",
-      "scenario id lists were computed on the original data; results ",
-      "on different data may be invalid.",
-      class = "weasel_data_mismatch"
-    )
+    legacy_names <- setdiff(names(fp), "pair_hash")
+    counts_same  <- identical(fp[legacy_names], now[legacy_names])
+    if (counts_same) {
+      # every aggregate count agrees; only the digest differs, so the
+      # participation was reassigned between ids and/or waves
+      .weasel_warn(
+        "the supplied data do not match the data this plan was built ",
+        "from: the aggregate counts agree (rows ", fp$n_rows,
+        ", unique (id, wave) pairs ", fp$n_pairs, ", distinct ids ",
+        fp$n_ids, "), but the deduplicated (id, wave) assignments ",
+        "differ (pair digest mismatch). the plan's scenario id lists ",
+        "were computed on the original data; results on different data ",
+        "may be invalid.",
+        class = "weasel_data_mismatch"
+      )
+    } else {
+      .weasel_warn(
+        "the supplied data do not structurally match the data this plan ",
+        "was built from (rows ", fp$n_rows, " -> ", now$n_rows,
+        ", unique (id, wave) pairs ", fp$n_pairs, " -> ", now$n_pairs,
+        ", distinct ids ", fp$n_ids, " -> ", now$n_ids, "). the plan's ",
+        "scenario id lists were computed on the original data; results ",
+        "on different data may be invalid.",
+        class = "weasel_data_mismatch"
+      )
+    }
   }
   invisible(same)
 }

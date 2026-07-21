@@ -1,0 +1,87 @@
+# release-time coherence: the released tag, DESCRIPTION, NEWS.md,
+# CITATION.cff, the site badge, and the latest-release endpoint must
+# agree. deliberately NOT an on-push workflow: between a version bump
+# and its release these values legitimately differ (sometimes for
+# weeks), so this runs only when a release is published or when
+# dispatched manually as part of the release checklist.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+name: release-coherence
+
+permissions: read-all
+
+jobs:
+  release-coherence:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: check tag, files, and latest-release agreement
+        shell: bash
+        env:
+          GH_EVENT: ${{ github.event_name }}
+          TAG: ${{ github.event.release.tag_name }}
+          REPO: ${{ github.repository }}
+        run: |
+          ver="$(sed -n 's/^Version:[[:space:]]*//p' DESCRIPTION | tr -d '[:space:]')"
+          if [ -z "$ver" ]; then
+            echo "::error::could not read Version from DESCRIPTION"
+            exit 1
+          fi
+          echo "DESCRIPTION version: $ver"
+
+          if [ "$GH_EVENT" = "release" ]; then
+            echo "released tag: $TAG"
+            # every released tag must have release notes in NEWS.md
+            tagver="${TAG#v}"
+            if ! grep -q "^# weasel ${tagver}\b" NEWS.md; then
+              echo "::error::NEWS.md has no '# weasel ${tagver}' heading for released tag ${TAG}"
+              exit 1
+            fi
+          fi
+
+          if [ "$GH_EVENT" = "workflow_dispatch" ] || [ "$TAG" = "v${ver}" ]; then
+            # current-version release (or manual steady-state check):
+            # the four file surfaces must agree with DESCRIPTION
+            if ! grep -Fq ">v${ver}<" docs/index.html; then
+              echo "::error::docs/index.html does not display v${ver}"
+              exit 1
+            fi
+            if ! grep -q "^# weasel ${ver}\b" NEWS.md; then
+              echo "::error::NEWS.md has no '# weasel ${ver}' heading"
+              exit 1
+            fi
+            if ! grep -q "^version: \"${ver}\"" CITATION.cff; then
+              echo "::error::CITATION.cff version does not match ${ver}"
+              exit 1
+            fi
+          else
+            # a backfilled release for an older tag (for example a
+            # retroactive v0.4.0 release while DESCRIPTION is already
+            # ahead): current-tree file checks do not apply to it
+            echo "backfilled release for ${TAG}; skipping current-tree checks"
+          fi
+
+          # the latest-release endpoint may never be AHEAD of
+          # DESCRIPTION; equality is required only once the current
+          # version's release exists (an inequality check, so this
+          # cannot fail during the bump-to-release window)
+          latest="$(curl -s "https://api.github.com/repos/${REPO}/releases/latest" |
+            sed -n 's/.*"tag_name":[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)"
+          echo "latest release: ${latest:-none}"
+          if [ -n "$latest" ]; then
+            latestver="${latest#v}"
+            newest="$(printf '%s\n%s\n' "$latestver" "$ver" | sort -V | tail -1)"
+            if [ "$latestver" != "$ver" ] && [ "$newest" = "$latestver" ]; then
+              echo "::error::latest release ${latest} is ahead of DESCRIPTION v${ver}"
+              exit 1
+            fi
+            if [ "$GH_EVENT" = "release" ] && [ "$TAG" = "v${ver}" ] && [ "$latestver" != "$ver" ]; then
+              echo "::warning::just-published v${ver} is not yet the latest release (${latest})"
+            fi
+          else
+            echo "::warning::no latest release resolvable from the API"
+          fi

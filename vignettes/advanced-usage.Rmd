@@ -42,7 +42,7 @@ anchored endpoints while tolerating interior gaps, or the reverse.
 
 `weasel_plan()` accepts a custom scenario table. It must contain the
 columns `scenario`, `require_endpoints`, `max_missing`, `n_gap_max`,
-and `max_gap_max`; the table is validated and a missing column raises
+and `max_gap_len`; the table is validated and a missing column raises
 an immediate error rather than silently selecting nobody.
 
 ```{r}
@@ -189,10 +189,14 @@ nrow(weasel_apply(p_light, "lenient", data = long_data))
 such plans because they only need the stored metrics.
 
 Reuniting a saved plan with the wrong data is guarded: every plan
-stores a structural fingerprint of the data it was built from, and
-explicitly supplied data are checked against it. A mismatch produces a
-classed warning (`weasel_data_mismatch`) rather than a silent, invalid
-subset:
+stores a structural fingerprint of the data it was built from,
+including an order-invariant digest of the deduplicated (id, wave)
+assignments, and explicitly supplied data are checked against it. The
+digest catches even panels whose aggregate counts coincide with the
+original (for example, participation swapped between respondents), and
+the guard applies exactly where a mismatch is possible: when data are
+passed back in explicitly. A mismatch produces a classed warning
+(`weasel_data_mismatch`) rather than a silent, invalid subset:
 
 ```{r}
 d_other <- long_data[-(1:10), ]
@@ -312,13 +316,22 @@ registers:
 
 ```{r}
 cat(weasel_justify_subset(plan_custom, "one_gap_ok", style = "concise"),
-    "\n\n")
+    "\n")
+```
+
+The in-text citation (package author and year) is derived
+automatically from the package's own citation metadata, so the
+zero-argument call is already fully citable; supply `author`/`year`
+only to override the derived reference:
+
+```{r}
+cat(weasel_justify_subset(plan_custom, "one_gap_ok"), "\n\n")
 cat(weasel_justify_subset(plan_custom, "one_gap_ok", style = "methods",
                           author = "van den Bosch", year = "2026"),
     "\n")
 ```
 
-The `extended` style adds sensitivity framing for reviewers:
+The `extended` style adds a fuller design rationale:
 
 ```{r}
 cat(weasel_justify_subset(plan_custom, "one_gap_ok", style = "extended"),

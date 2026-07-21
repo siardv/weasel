@@ -101,8 +101,10 @@ strictly between a respondent's first and last observed wave).
   completeness-based selection skews the sample.
 * `weasel_scope_info()` prints the state of the active scope.
 * Plans record their planning population (the denominator behind every
-  retention figure) and a structural fingerprint of their data;
-  reuniting a saved plan with different data warns
+  retention figure) and a structural fingerprint of their data,
+  including an order-invariant digest of the deduplicated (id, wave)
+  assignments; reuniting a saved plan with explicitly re-supplied data
+  that differ, even when every aggregate count coincides, warns
   (`weasel_data_mismatch`).
 
 ## Options
