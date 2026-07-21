@@ -125,3 +125,58 @@ test_that("plan-side metrics and summaries agree for factor ids", {
                    as.numeric(row$endpoint_rate))
   expect_identical(s$headline$n_ids, as.integer(row$n_ids))
 })
+
+# phase 5 institutionalization: representation invariance must hold in
+# BOTH pipelines, not only in plan-side summaries where the 0.4.1
+# incident surfaced; the same panel goes through the scope pipeline
+# under every id representation, and the cross-pipeline equivalence
+# property is asserted under factor ids as well
+
+test_that("scope-pipeline retention and summaries are invariant to the id representation", {
+  scope_run <- function(d) {
+    suppressMessages(
+      set_weasel_scope(d, "id", "time", max_missing = 0, max_gap_len = 0,
+                       n_gap_max = 0, require_endpoints = TRUE)
+    )
+    on.exit(weasel_clear_scope(), add = TRUE)
+    pv <- suppressMessages(suppressWarnings(weasel_reshape_to_wide()))
+    sw <- suppressMessages(weasel_summarize_waves())
+    list(ids = sort(as.character(pv$id)), sw = sw)
+  }
+  reps <- list(
+    character      = identity,
+    factor_clean   = function(x) factor(x),
+    factor_unused  = function(x) factor(x, levels = c("A", "B", "C", "D", "ghost")),
+    factor_reorder = function(x) factor(x, levels = c("D", "C", "B", "A"))
+  )
+  runs <- lapply(reps, function(tr) scope_run(fid_data(tr)))
+  for (nm in names(runs)) {
+    expect_identical(runs[[nm]]$ids, c("A", "B"), info = nm)
+  }
+  for (nm in names(runs)[-1]) {
+    expect_identical(runs[[nm]]$sw, runs$character$sw, info = nm)
+  }
+
+  d_int <- fid_data()
+  d_int$id <- match(d_int$id, c("A", "B", "C", "D"))
+  r_int <- scope_run(d_int)
+  expect_identical(r_int$ids, c("1", "2"))
+  expect_identical(r_int$sw, runs$character$sw)
+})
+
+test_that("scope and plan pipelines agree for factor ids with unused levels", {
+  for (tr in list(function(x) factor(x, levels = c("A", "B", "C", "D")),
+                  function(x) factor(x, levels = c("D", "C", "B", "A")))) {
+    d <- fid_data(tr)
+    p <- suppressMessages(
+      weasel_plan(d, "id", "time", span = "full", scenarios = fid_strict())
+    )
+    suppressMessages(
+      set_weasel_scope(d, "id", "time", max_missing = 0, max_gap_len = 0,
+                       n_gap_max = 0, require_endpoints = TRUE)
+    )
+    pv <- suppressMessages(suppressWarnings(weasel_reshape_to_wide()))
+    weasel_clear_scope()
+    expect_setequal(as.character(pv$id), as.character(p$plan$ids[[1]]))
+  }
+})
