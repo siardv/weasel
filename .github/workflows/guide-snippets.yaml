@@ -64,3 +64,9 @@ jobs:
             fi
           done
           exit $fail
+
+      # executability and semantic agreement are different guarantees:
+      # the loop above proves each snippet runs; this step proves the
+      # bounded recipe's displayed pattern equals its extracted pattern
+      - name: Guide semantic parity
+        run: Rscript tools/check-guide-semantics.R

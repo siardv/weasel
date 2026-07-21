@@ -72,7 +72,16 @@
   }
 
   W <- length(grid_full)
-  L <- min(max(as.integer(min_len), 2L), W)
+  min_len_i <- as.integer(min_len)
+  L <- min(max(min_len_i, 2L), W)
+  # no automatic decision is silent: an infeasible requested window
+  # length is clamped into 2:W, and the adjustment is reported
+  if (L != min_len_i) {
+    .weasel_msg(
+      "core_len = ", min_len_i, " is outside the feasible window range 2:",
+      W, " for this grid; using core_len = ", L, "."
+    )
+  }
 
   ok   <- !is.na(data[[id_col]]) & !is.na(data[[wave_col]])
   ids0 <- data[[id_col]][ok]
@@ -184,10 +193,15 @@ weasel_match_scenario <- function(scenario, choices) {
 #'   as returned by [weasel_plan()].
 #' @param weights Named numeric vector overriding any of the default
 #'   weights `c(coverage = 2, endpoints = 1.2, size = 0.8,
-#'   missing = 0.6, gaps = 0.4)`. `NA` values are rejected.
+#'   missing = 0.6, gaps = 0.4)`. `NA` values are rejected. Zero and
+#'   negative weights are accepted deliberately: a zero weight removes
+#'   a term from the score, and a negative weight inverts the
+#'   direction of its contribution.
 #' @param tie_tolerance Single non-negative number; scenarios whose
 #'   scores are within this distance of the best score are flagged as
-#'   `near_tie` (only when at least two qualify).
+#'   `near_tie` (only when at least two qualify). Must be supplied as
+#'   an actual numeric scalar: vectors, `NA`, and character values are
+#'   rejected rather than silently reduced or converted.
 #'
 #' @return The plan data frame with added `score`, `recommended`, and
 #'   `near_tie` columns. The active weights are attached as attribute
@@ -226,10 +240,15 @@ weasel_compare_scenarios <- function(plan_obj, weights = NULL,
     if (anyNA(weights)) .weasel_stop("weights must not contain NA.")
     w[wn] <- weights
   }
-  tie_tolerance <- suppressWarnings(as.numeric(tie_tolerance[1]))
-  if (is.na(tie_tolerance) || tie_tolerance < 0) {
-    .weasel_stop("tie_tolerance must be a single non-negative number.")
+  # strict scalar contract: a vector would silently use only its first
+  # element, and a character value would silently convert; both are
+  # rejected instead
+  if (!is.numeric(tie_tolerance) || length(tie_tolerance) != 1 ||
+      is.na(tie_tolerance) || tie_tolerance < 0) {
+    .weasel_stop("tie_tolerance must be a single non-negative number ",
+                 "(vectors, NA, and non-numeric values are rejected).")
   }
+  tie_tolerance <- as.numeric(tie_tolerance)
 
   num_cols <- c("mean_prop_present", "endpoint_rate", "worst_missing",
                 "mean_n_gap", "mean_max_gap", "L", "n_ids")
@@ -362,6 +381,9 @@ weasel_compare_to_sentence <- function(cmp, digits = 3) {
 #'   (all waves). Ignored when explicit `lower`/`upper` bounds are
 #'   supplied; supplying both raises an error.
 #' @param core_len Integer; desired window length when `span = "core"`.
+#'   Values outside the feasible range (below 2, or above the number of
+#'   grid waves) are clamped to it, and the adjustment is reported in a
+#'   verbose-mode message rather than applied silently.
 #' @param lower,upper Optional explicit integer window bounds. When
 #'   either is supplied the analysis window is fixed a priori
 #'   (`span_reason = "explicit"`), which the justification text reports
@@ -373,7 +395,16 @@ weasel_compare_to_sentence <- function(cmp, digits = 3) {
 #'   `n_gap_max`, `max_gap_len`. The table is validated; missing
 #'   columns raise an error. The pre-0.4 column name `max_gap_max` is
 #'   still accepted with a deprecation warning (class
-#'   `weasel_deprecated`).
+#'   `weasel_deprecated`). Tolerance columns may arrive as numbers,
+#'   numeric-looking character values, or factors; factors are
+#'   converted through their displayed labels, never through their
+#'   internal level codes, so a validated table always carries exactly
+#'   the tolerances the user wrote. Uninterpretable, negative, or
+#'   fractional values are rejected with an error naming the column
+#'   and the offending value (`Inf` still means "no constraint").
+#'   `require_endpoints` accepts logical values, the imported labels
+#'   `"TRUE"`/`"FALSE"`/`"T"`/`"F"`, or the exact numbers 0/1; broader
+#'   coercions such as `2` or `"yes"` are rejected.
 #' @param grid How the wave grid inside the span is defined.
 #'   `"consecutive"` (default) treats every integer between the span
 #'   bounds as a scheduled wave; `"observed"` uses only wave values
@@ -398,9 +429,14 @@ weasel_compare_to_sentence <- function(cmp, digits = 3) {
 #'   distinct ids in the data, ids and unique pairs observed in the
 #'   span; all retention proportions are relative to
 #'   `"observed_in_span"`), `fingerprint` (a structural fingerprint of
-#'   the data used to detect mismatched reunions later), `id`, and
-#'   `wave`. When `keep_data = TRUE` the original `data` is attached as
-#'   an attribute. Printing the object shows a compact summary instead
+#'   the data: aggregate counts plus an order-invariant digest of the
+#'   deduplicated (id, wave) assignments, used to detect mismatched
+#'   reunions later; the guard applies only when data are supplied
+#'   explicitly to [weasel_apply()], [weasel_summarize_subset()], or
+#'   [weasel_selectivity()], since the attached-data path cannot
+#'   mismatch by construction), `id`, and `wave`. When
+#'   `keep_data = TRUE` the original `data` is attached as an
+#'   attribute. Printing the object shows a compact summary instead
 #'   of the raw list.
 #'
 #' @examples
@@ -790,7 +826,30 @@ weasel_summarize_subset <- function(plan_obj, scenario, data = NULL,
     stringsAsFactors = FALSE
   )
 
-  waves_by_id <- split(id_wave[[wave]], id_wave[[id]])
+  # group against the plan's retained ids via match(), so the summary
+  # denominator comes from the plan itself, never from residual factor
+  # metadata: unused factor levels previously produced phantom empty
+  # groups that corrupted every headline statistic while n_ids stayed
+  # correct
+  group_index <- match(id_wave[[id]], ids_keep)
+  if (anyNA(group_index)) {
+    .weasel_stop(
+      "internal inconsistency: the subset contains id(s) outside the ",
+      "scenario's retained set. please report this.",
+      class = "weasel_error_internal"
+    )
+  }
+  waves_by_id <- split(id_wave[[wave]],
+                       factor(group_index, levels = seq_along(ids_keep)))
+  if (length(waves_by_id) != length(ids_keep)) {
+    .weasel_stop(
+      "internal inconsistency: grouped ", length(waves_by_id),
+      " respondent(s) for ", length(ids_keep), " retained id(s); ",
+      "summary statistics would use different denominators. please ",
+      "report this.",
+      class = "weasel_error_internal"
+    )
+  }
   n_present   <- vapply(waves_by_id, function(w) length(unique(w)), integer(1))
   n_missing   <- L - n_present
 

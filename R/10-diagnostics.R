@@ -11,7 +11,9 @@
 #' to the chosen tolerances before committing to a scenario.
 #'
 #' @param plan_obj Object returned by [weasel_plan()].
-#' @param require_endpoints Logical values to evaluate.
+#' @param require_endpoints Logical values to evaluate. Must be actual
+#'   logical `TRUE`/`FALSE` values; numeric or character stand-ins
+#'   (for example `2` or `"TRUE"`) are rejected rather than coerced.
 #' @param max_missing Integer tolerances for missing waves in the span.
 #' @param n_gap_max Integer tolerances for the number of interior gaps.
 #' @param max_gap_len Integer tolerances for the longest interior gap.
@@ -48,10 +50,16 @@ weasel_sensitivity <- function(plan_obj,
     if (missing(max_gap_len)) max_gap_len <- max_gap_max
   }
 
-  require_endpoints <- unique(as.logical(require_endpoints))
-  if (length(require_endpoints) == 0 || anyNA(require_endpoints)) {
-    .weasel_stop("require_endpoints must contain TRUE and/or FALSE.")
+  # actual logical values only: as.logical() would let arbitrary
+  # nonzero numerics (or "TRUE" strings) silently become endpoint
+  # requirements, changing which respondents a sweep row counts
+  if (!is.logical(require_endpoints) || length(require_endpoints) == 0 ||
+      anyNA(require_endpoints)) {
+    .weasel_stop("require_endpoints must contain only actual logical ",
+                 "values (TRUE and/or FALSE); numeric or character ",
+                 "stand-ins are not coerced.")
   }
+  require_endpoints <- unique(require_endpoints)
   check_tol <- function(x, name) {
     ok <- is.numeric(x) && length(x) > 0 && !anyNA(x) &&
       all(is.finite(x)) && all(abs(x - round(x)) <= 1e-8) && all(x >= 0)

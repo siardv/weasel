@@ -11,11 +11,16 @@ weasel_compare_scenarios(plan_obj, weights = NULL, tie_tolerance = 0.01)
 as returned by \code{\link[=weasel_plan]{weasel_plan()}}.}
 
 \item{weights}{Named numeric vector overriding any of the default
-weights \code{c(coverage = 2, endpoints = 1.2, size = 0.8, missing = 0.6, gaps = 0.4)}. \code{NA} values are rejected.}
+weights \code{c(coverage = 2, endpoints = 1.2, size = 0.8, missing = 0.6, gaps = 0.4)}. \code{NA} values are rejected. Zero and
+negative weights are accepted deliberately: a zero weight removes
+a term from the score, and a negative weight inverts the
+direction of its contribution.}
 
 \item{tie_tolerance}{Single non-negative number; scenarios whose
 scores are within this distance of the best score are flagged as
-\code{near_tie} (only when at least two qualify).}
+\code{near_tie} (only when at least two qualify). Must be supplied as
+an actual numeric scalar: vectors, \code{NA}, and character values are
+rejected rather than silently reduced or converted.}
 }
 \value{
 The plan data frame with added \code{score}, \code{recommended}, and

@@ -12,5 +12,4 @@
 ^\.github$
 ^LICENSE\.md$
 ^CITATION\.cff$
-^v3$
-^update_github_repo\.sh$
+^tools$

@@ -30,16 +30,19 @@ is supplied.}
 \item{n_vars}{Number of outcome variables to generate.}
 
 \item{prop_random}{Probability that any given (respondent, wave)
-observation is skipped at random.}
+observation is skipped at random. Like every \code{prop_*} parameter,
+it must be a single number in \code{[0, 1]}; invalid values fail
+immediately, before any random draw.}
 
 \item{prop_attention}{Asymptotic probability of attention-related
 wave skipping at late waves.}
 
 \item{attention_center}{Wave position at which the attention-decay
-curve is centred.}
+curve is centred. Must be a single finite number.}
 
 \item{attention_scale}{Steepness of the attention-decay curve;
-larger values give a more gradual increase.}
+larger values give a more gradual increase. Must be a single
+finite number greater than zero.}
 
 \item{prop_attrition}{Proportion of respondents who permanently drop
 out from a random wave onwards.}
@@ -62,9 +65,11 @@ positions of this schedule, and the returned \code{time} column contains
 these labels. Analyse such data with \code{grid = "observed"} in
 \code{\link[=weasel_plan]{weasel_plan()}} or \code{\link[=set_weasel_scope]{set_weasel_scope()}}.}
 
-\item{seed}{Random seed. If \code{NULL}, a seed is drawn and reported so
-the data set can be regenerated. A given seed reproduces the same
-panel regardless of the caller's \code{RNGkind()}; see Details.}
+\item{seed}{Random seed; a single integer-valued number (fractional
+and non-numeric values are rejected before \code{set.seed()} is
+reached). If \code{NULL}, a seed is drawn and reported so the data set
+can be regenerated. A given seed reproduces the same panel
+regardless of the caller's \code{RNGkind()}; see Details.}
 }
 \value{
 A data frame in long format with columns \code{id}, \code{time}, and

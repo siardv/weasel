@@ -23,13 +23,16 @@
 #'   is supplied.
 #' @param n_vars Number of outcome variables to generate.
 #' @param prop_random Probability that any given (respondent, wave)
-#'   observation is skipped at random.
+#'   observation is skipped at random. Like every `prop_*` parameter,
+#'   it must be a single number in `[0, 1]`; invalid values fail
+#'   immediately, before any random draw.
 #' @param prop_attention Asymptotic probability of attention-related
 #'   wave skipping at late waves.
 #' @param attention_center Wave position at which the attention-decay
-#'   curve is centred.
+#'   curve is centred. Must be a single finite number.
 #' @param attention_scale Steepness of the attention-decay curve;
-#'   larger values give a more gradual increase.
+#'   larger values give a more gradual increase. Must be a single
+#'   finite number greater than zero.
 #' @param prop_attrition Proportion of respondents who permanently drop
 #'   out from a random wave onwards.
 #' @param prop_block Proportion of respondents who miss one contiguous
@@ -45,9 +48,11 @@
 #'   positions of this schedule, and the returned `time` column contains
 #'   these labels. Analyse such data with `grid = "observed"` in
 #'   [weasel_plan()] or [set_weasel_scope()].
-#' @param seed Random seed. If `NULL`, a seed is drawn and reported so
-#'   the data set can be regenerated. A given seed reproduces the same
-#'   panel regardless of the caller's `RNGkind()`; see Details.
+#' @param seed Random seed; a single integer-valued number (fractional
+#'   and non-numeric values are rejected before `set.seed()` is
+#'   reached). If `NULL`, a seed is drawn and reported so the data set
+#'   can be regenerated. A given seed reproduces the same panel
+#'   regardless of the caller's `RNGkind()`; see Details.
 #'
 #' @return A data frame in long format with columns `id`, `time`, and
 #'   `var1` ... `varN`. Respondents keep at least one observed wave, so
@@ -92,6 +97,26 @@ generate_weasel_dummy_data <- function(n_ids = 1000,
   n_times  <- .weasel_check_count(n_times, "n_times")
   n_vars   <- .weasel_check_count(n_vars, "n_vars")
   id_start <- .weasel_check_bound(id_start, "id_start")
+  # every probability, shape, and seed parameter is validated here,
+  # before any random draw, so invalid inputs fail immediately with the
+  # parameter named instead of surfacing later as an unrelated sampling
+  # error or a silently degenerate panel
+  prop_random       <- .weasel_check_prob(prop_random, "prop_random")
+  prop_attention    <- .weasel_check_prob(prop_attention, "prop_attention")
+  prop_attrition    <- .weasel_check_prob(prop_attrition, "prop_attrition")
+  prop_block        <- .weasel_check_prob(prop_block, "prop_block")
+  prop_item_missing <- .weasel_check_prob(prop_item_missing,
+                                          "prop_item_missing")
+  if (!(length(attention_scale) == 1 && is.numeric(attention_scale) &&
+        !is.na(attention_scale) && is.finite(attention_scale) &&
+        attention_scale > 0)) {
+    .weasel_stop("attention_scale must be a single finite number > 0.")
+  }
+  if (!(length(attention_center) == 1 && is.numeric(attention_center) &&
+        !is.na(attention_center) && is.finite(attention_center))) {
+    .weasel_stop("attention_center must be a single finite number.")
+  }
+  if (!is.null(seed)) seed <- .weasel_check_bound(seed, "seed")
   if (is.null(n_ids) || is.null(n_times) || is.null(n_vars) ||
       is.null(id_start)) {
     .weasel_stop("n_ids, n_times, n_vars, and id_start must not be NULL.")
