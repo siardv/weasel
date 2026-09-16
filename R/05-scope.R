@@ -345,20 +345,12 @@ weasel_reshape_to_wide <- function() {
 
   .weasel_report_dropped(dat, id_col, wave_col, span)
 
-  ok    <- !is.na(dat[[id_col]]) & !is.na(dat[[wave_col]])
-  ids0  <- dat[[id_col]][ok]
-  w0    <- as.integer(round(dat[[wave_col]][ok]))
-  in_sp <- w0 %in% span
-  ids_v <- ids0[in_sp]
-  w_v   <- w0[in_sp]
+  participation <- .weasel_prepare_participation(dat, id_col, wave_col, span)
+  ids_v <- participation$ids
+  pos   <- participation$positions
   if (length(ids_v) == 0) .weasel_stop("no rows in the selected span.")
 
-  dd <- .weasel_dedup_index(ids_v, w_v)
-  .weasel_warn_duplicates(dd$n_dup, id_col, wave_col)
-  ids_v <- ids_v[dd$idx]
-  w_v   <- w_v[dd$idx]
-
-  pos <- match(w_v, span)
+  .weasel_warn_duplicates(participation$n_dup, id_col, wave_col)
   met <- .weasel_gap_metrics(ids_v, pos, L)
 
   keep <- met$n_present >= env$min_obs

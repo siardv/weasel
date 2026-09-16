@@ -1,5 +1,8 @@
 # Development version
 
+* Scope and planning now share the internal preparation of respondent-wave
+  participation. Selection, metrics, duplicate warnings, and saved-plan
+  behavior are unchanged.
 * Concise `weasel_justify_subset()` output now reports the recorded planning
   population and retention denominator, consistently with the methods and
   extended styles. Saved plans work without attached data; older plans without
