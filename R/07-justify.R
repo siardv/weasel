@@ -24,6 +24,12 @@
 #' Other criteria (including endpoint requirements and finite tolerances)
 #' still apply. Missing tolerance metadata is not treated as unlimited.
 #'
+#' All styles report the recorded planning population: respondents observed
+#' at least once within the analysis window, out of all distinct respondents
+#' in the supplied data. Retention is relative to the in-window population.
+#' This description uses stored plan metadata and does not require attached
+#' data. Older plans without population metadata omit the description.
+#'
 #' @param plan_obj Object returned by [weasel_plan()].
 #' @param scenario Name (or unambiguous abbreviation) of the scenario.
 #' @param style One of `"methods"` (full methods-section paragraph),
@@ -246,6 +252,7 @@ weasel_justify_subset <- function(plan_obj,
       if (!is.na(n_ids)) {
         sprintf("This strategy retained %s respondent(s).", n_ids)
       } else NULL,
+      pop_txt,
       if (length(diag_parts) > 0) {
         paste0("In the resulting subset, ",
                paste(diag_parts, collapse = "; "), ".")

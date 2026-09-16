@@ -1,5 +1,9 @@
 # Development version
 
+* Concise `weasel_justify_subset()` output now reports the recorded planning
+  population and retention denominator, consistently with the methods and
+  extended styles. Saved plans work without attached data; older plans without
+  population metadata continue to omit this description. Selection is unchanged.
 * `weasel_justify_subset()` now preserves unlimited (`Inf`) tolerances and
   describes each unlimited dimension without integer-coercion warnings or
   dropped gap constraints. Finite constraints still appear in mixed cases,
