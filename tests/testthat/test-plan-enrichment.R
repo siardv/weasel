@@ -2,16 +2,16 @@
 # qualified recommendations, population counts, data fingerprints, and
 # stable pattern ids
 
-test_that("explicit lower/upper bounds fix the window a priori", {
+test_that("explicit lower/upper bounds set a user-supplied window", {
   d <- make_fixture()
   p <- weasel_plan(d, "id", "time", lower = 3, upper = 6)
   expect_equal(p$span, 3:6)
   expect_identical(p$span_reason, "explicit")
   expect_null(p$span_candidates)
 
-  # justification reports a design decision, not a span rule
+  # justification records supplied bounds without inferring decision timing
   txt <- weasel_justify_subset(p, "lenient")
-  expect_match(txt, "fixed a priori", fixed = TRUE)
+  expect_match(txt, "user-supplied bounds", fixed = TRUE)
   expect_match(txt, "waves 3 to 6", fixed = TRUE)
 
   # supplying both span and bounds is an error

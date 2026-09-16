@@ -223,11 +223,10 @@ c(lower = plan_full$lower, upper = plan_full$upper)
 
 ## Explicit analysis windows
 
-When the window is determined by the study design rather than by
-coverage, pass explicit bounds; the plan records the window as an
-a-priori decision (`span_reason = "explicit"`), and
-`weasel_justify_subset()` reports it as such instead of crediting an
-automatic rule:
+To supply your own analysis window, pass explicit bounds. The plan
+records `span_reason = "explicit"`, and `weasel_justify_subset()`
+describes the bounds as user-supplied without inferring when or why
+they were chosen:
 
 ```{r}
 plan_fixed <- weasel_plan(long_data, "id", "time", lower = 3, upper = 10)

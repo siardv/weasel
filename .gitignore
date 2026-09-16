@@ -1,8 +1,46 @@
-.Rhistory
-.RData
-.Rproj.user
-.DS_Store
-doc/
-Meta/
-*.Rcheck/
-weasel_*.tar.gz
+# new files are ignored unless they serve a maintained role below
+*
+
+# package metadata, licensing, citation, and entry-point documentation
+!/.gitignore
+!/.Rbuildignore
+!/DESCRIPTION
+!/NAMESPACE
+!/LICENSE
+!/LICENSE.md
+!/CITATION.cff
+!/NEWS.md
+!/README.md
+
+# package source, help, tests, and vignette sources
+!/R/
+!/R/[!.]*.R
+!/man/
+!/man/[!.]*.Rd
+!/tests/
+!/tests/testthat.R
+!/tests/testthat/
+!/tests/testthat/[!.]*.R
+!/tests/testthat/_snaps/
+!/tests/testthat/_snaps/snapshots.md
+!/vignettes/
+!/vignettes/[!.]*.Rmd
+!/inst/
+!/inst/CITATION
+!/inst/examples/
+!/inst/examples/example_usage.R
+
+# published guide sources and their verification
+!/docs/
+!/docs/.nojekyll
+!/docs/index.html
+!/docs/app.js
+!/docs/styles.css
+!/tools/
+!/tools/check-guide-semantics.R
+!/tools/check_inclusion_policy.R
+
+# continuous integration and release checks
+!/.github/
+!/.github/workflows/
+!/.github/workflows/[!.]*.yaml

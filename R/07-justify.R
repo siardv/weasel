@@ -12,6 +12,18 @@
 #' respondents cannot be justified and raises a classed error
 #' (`weasel_error_empty_scenario`).
 #'
+#' All styles describe the recorded window-selection method: user-supplied
+#' bounds for explicit windows, the full wave grid for full spans, or the
+#' highest total count of distinct respondent-wave pairs among equal-length
+#' contiguous grid windows for core spans (earliest window on ties). These
+#' descriptions do not establish when bounds were chosen, sample stability,
+#' or methodological superiority. If the plan does not record a selection
+#' method, that description is omitted.
+#'
+#' A tolerance of `Inf` is described as no separate limit on that dimension.
+#' Other criteria (including endpoint requirements and finite tolerances)
+#' still apply. Missing tolerance metadata is not treated as unlimited.
+#'
 #' @param plan_obj Object returned by [weasel_plan()].
 #' @param scenario Name (or unambiguous abbreviation) of the scenario.
 #' @param style One of `"methods"` (full methods-section paragraph),
@@ -75,21 +87,23 @@ weasel_justify_subset <- function(plan_obj,
   }
 
   get1 <- function(x) if (length(x) == 0) NA else x[[1]]
+  # preserve unlimited values and finite count truncation without integer overflow
+  get_limit <- function(x) trunc(as.numeric(get1(x)))
 
   lower             <- as.integer(get1(row$lower))
   upper             <- as.integer(get1(row$upper))
   L                 <- as.integer(get1(row$L))
   n_ids             <- as.integer(get1(row$n_ids))
   require_endpoints <- as.logical(get1(row$require_endpoints))
-  max_missing       <- as.integer(get1(row$max_missing))
-  n_gap_max         <- as.integer(get1(row$n_gap_max))
+  max_missing       <- get_limit(row$max_missing)
+  n_gap_max         <- get_limit(row$n_gap_max)
   # plans saved before 0.4.0 store this column as max_gap_max
   gl_col      <- if (!is.null(row[["max_gap_len"]])) {
     row[["max_gap_len"]]
   } else {
     row[["max_gap_max"]]
   }
-  max_gap_len <- as.integer(get1(gl_col))
+  max_gap_len <- get_limit(gl_col)
   mean_prop_present <- suppressWarnings(as.numeric(get1(row$mean_prop_present)))
   endpoint_rate     <- suppressWarnings(as.numeric(get1(row$endpoint_rate)))
   span_reason <- if ("span_reason" %in% names(row)) {
@@ -111,6 +125,24 @@ weasel_justify_subset <- function(plan_obj,
   }
 
   fmt <- function(x) .weasel_format_num(x, digits)
+  fmt_limit <- function(x) sprintf("%.0f", x)
+
+  span_txt <- if (!is.na(span_reason) && nzchar(span_reason)) {
+    if (identical(span_reason, "explicit")) {
+      "The analysis window used user-supplied bounds from the planning call."
+    } else if (identical(span_reason, "full")) {
+      "The analysis window used the full wave grid from the first to the last grid wave."
+    } else if (identical(span_reason, "core")) {
+      "The analysis window was selected using the core span rule: the highest total count of distinct respondent-wave pairs among contiguous windows of the same length on the wave grid; ties are resolved in favour of the earliest window."
+    } else {
+      sprintf(
+        "The analysis window was selected using the package's span rule (%s).",
+        span_reason
+      )
+    }
+  } else {
+    NULL
+  }
 
   waves_txt <- if (!is.na(lower) && !is.na(upper)) {
     sprintf("waves %s to %s", lower, upper)
@@ -134,12 +166,14 @@ weasel_justify_subset <- function(plan_obj,
   }
 
   miss_txt <- if (!is.na(max_missing)) {
-    if (max_missing == 0) {
+    if (max_missing == Inf) {
+      "imposed no separate limit on the number of missing waves within the window"
+    } else if (max_missing == 0) {
       "required complete participation within the window (no missing waves)"
     } else if (max_missing == 1) {
       "allowed at most one missing wave within the window"
     } else {
-      sprintf("allowed up to %s missing waves within the window", max_missing)
+      sprintf("allowed up to %s missing waves within the window", fmt_limit(max_missing))
     }
   } else {
     "applied an explicit limit on missing waves within the window"
@@ -147,10 +181,24 @@ weasel_justify_subset <- function(plan_obj,
 
   gap_txt <- NULL
   if (!is.na(n_gap_max) && !is.na(max_gap_len)) {
-    gap_txt <- sprintf(
-      "and restricted the missingness structure (at most %s interior missing block(s), each no longer than %s wave(s))",
-      n_gap_max, max_gap_len
-    )
+    if (n_gap_max == Inf && max_gap_len == Inf) {
+      gap_txt <- "and imposed no separate limits on the number or length of interior missing blocks"
+    } else if (n_gap_max == Inf) {
+      gap_txt <- sprintf(
+        "and restricted the missingness structure (no separate limit on the number of interior missing blocks, each no longer than %s wave(s))",
+        fmt_limit(max_gap_len)
+      )
+    } else if (max_gap_len == Inf) {
+      gap_txt <- sprintf(
+        "and restricted the missingness structure (at most %s interior missing block(s), with no separate limit on block length)",
+        fmt_limit(n_gap_max)
+      )
+    } else {
+      gap_txt <- sprintf(
+        "and restricted the missingness structure (at most %s interior missing block(s), each no longer than %s wave(s))",
+        fmt_limit(n_gap_max), fmt_limit(max_gap_len)
+      )
+    }
   }
 
   cov_txt <- if (!is.na(mean_prop_present)) {
@@ -189,6 +237,7 @@ weasel_justify_subset <- function(plan_obj,
         "We selected a longitudinal analysis subset using the %s framework (%s)%s.",
         acronym, full_name, cite_txt
       ),
+      span_txt,
       sprintf(
         "Within %s, we %s, %s%s.",
         waves_txt, endpoint_txt, miss_txt,
@@ -235,16 +284,7 @@ weasel_justify_subset <- function(plan_obj,
       if (!is.na(note) && nzchar(note)) {
         sprintf("This scenario is characterized as: %s.", note)
       } else NULL,
-      if (!is.na(span_reason) && nzchar(span_reason)) {
-        if (identical(span_reason, "explicit")) {
-          "The analysis window was fixed a priori through explicit bounds supplied to the planning call, rather than chosen by an automatic rule."
-        } else {
-          sprintf(
-            "The analysis window was selected using the package's span rule (%s), which prioritizes a coherent window with comparatively strong participation.",
-            span_reason
-          )
-        }
-      } else NULL,
+      span_txt,
       "All selection decisions were rule-based and reproducible, and can be regenerated from the same inputs and parameters using the weasel workflow."
     )
     return(.collapse_parts(parts))
@@ -279,16 +319,7 @@ weasel_justify_subset <- function(plan_obj,
         note
       )
     } else NULL,
-    if (!is.na(span_reason) && nzchar(span_reason)) {
-      if (identical(span_reason, "explicit")) {
-        "The analysis window was fixed a priori through explicit bounds supplied to the planning call, rather than produced by a coverage rule; the window choice is therefore a design decision documented here."
-      } else {
-        sprintf(
-          "The chosen window was produced by the package's span rule (%s). In practice, this emphasizes a stable segment of the panel rather than maximizing the nominal wave range.",
-          span_reason
-        )
-      }
-    } else NULL,
+    span_txt,
     "This approach improves transparency because the inclusion set is fully determined by declared constraints (window bounds, endpoint handling, and permitted missingness structure) rather than subjective post hoc decisions."
   )
   .collapse_parts(parts)

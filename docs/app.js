@@ -117,10 +117,9 @@ const TREE = {
       "analysis is observed within the same bounded segment of the panel. " +
       "`span = \"full\"` includes every observed wave and is appropriate when the wave count " +
       "need not be fixed, for example in random-intercept models or survival analyses " +
-      "where respondents can have different observation lengths. If the window is fixed by " +
-      "the study design, skip `span` and pass explicit `lower`/`upper` bounds instead: the " +
-      "plan records the window as an a-priori decision and the justification text reports " +
-      "it as such.",
+      "where respondents can have different observation lengths. To supply your own window, " +
+      "skip `span` and pass explicit `lower`/`upper` bounds instead. The justification text " +
+      "describes the bounds as user-supplied, without inferring when or why they were chosen.",
     yes: {
       label: "Yes, I need a fixed-length window",
       next: "result_plan_justify_core",
