@@ -119,3 +119,60 @@ test_that("a resolved span with no valid participants preserves caller errors", 
                  "no rows in the selected span", fixed = TRUE)
   }
 })
+
+test_that("planning warns for normalized duplicate rows throughout supplied data", {
+  scenarios <- data.frame(scenario = "all", require_endpoints = FALSE,
+                          max_missing = Inf, n_gap_max = Inf, max_gap_len = Inf)
+  for (grid in c("consecutive", "observed")) {
+    span <- if (grid == "consecutive") 1:3 else c(1L, 4L, 9L)
+    for (inside in c(TRUE, FALSE)) {
+      duplicate_wave <- if (inside) 1 else 0
+      d <- data.frame(
+        id = factor(c(rep("A", 3), rep("B", 3), "C", "C", NA, NA, "A", "A"),
+                    levels = c("unused", "C", "B", "A")),
+        time = c(span, duplicate_wave + c(0, 1e-9, -1e-9),
+                 duplicate_wave + c(0, 1e-9), 1, 1 + 1e-9, NA, NA),
+        value = seq_len(12)
+      )
+      make_plan <- function(data) suppressMessages(
+        weasel_plan(data, "id", "time", lower = span[1], upper = tail(span, 1),
+                    grid = grid, scenarios = scenarios, keep_data = FALSE)
+      )
+      # two extra B rows plus one extra C row; missing IDs/waves do not count
+      expect_warning(p <- make_plan(d), "^3 duplicated", class = "weasel_duplicates")
+      normalized <- d
+      normalized$time <- round(normalized$time)
+      expect_identical(p, suppressWarnings(make_plan(normalized)))
+      reversed <- d[rev(seq_len(nrow(d))), ]
+      expect_warning(p_reversed <- make_plan(reversed), "^3 duplicated",
+                     class = "weasel_duplicates")
+      expect_identical(p_reversed, p)
+      expect_identical(p$id_metrics$n_present,
+                       if (inside) c(1L, 1L, 3L) else 3L)
+
+      # original fractional values and all selected physical rows survive
+      keep <- !is.na(d$id) & !is.na(d$time) & round(d$time) %in% span
+      if (inside) {
+        expect_warning(out <- weasel_apply(p, "all", data = d), "^3 duplicated",
+                       class = "weasel_duplicates")
+      } else {
+        expect_no_warning(out <- weasel_apply(p, "all", data = d))
+      }
+      expect_identical(out, d[keep, ])
+    }
+  }
+})
+
+test_that("wave normalization does not invent duplicates or accept fractional waves", {
+  d <- data.frame(
+    id = c("A", "A", "B", "B", NA, NA, "A", "A"),
+    time = c(1 - 1e-9, 2 + 1e-9, 1 + 1e-9, 3 - 1e-9,
+             1, 1 + 1e-9, NA, NA)
+  )
+  expect_no_warning(suppressMessages(
+    weasel_plan(d, "id", "time", lower = 1, upper = 3)
+  ))
+  d$time[1] <- 1.1
+  expect_error(weasel_plan(d, "id", "time", lower = 1, upper = 3),
+               "must contain integer-valued wave numbers", fixed = TRUE)
+})

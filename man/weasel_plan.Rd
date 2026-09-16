@@ -20,13 +20,16 @@ weasel_plan(
 \arguments{
 \item{data}{A long-format data frame. A respondent is considered
 observed at a wave if a row with that (id, wave) pair exists.
-Duplicated (id, wave) rows are counted once and trigger a warning.}
+Duplicated (id, wave) rows are counted once and trigger a warning.
+The check covers non-missing pairs in all supplied rows, including
+rows outside the selected window.}
 
 \item{id}{Name of the respondent-identifier column. Any atomic type
 is supported.}
 
 \item{wave}{Name of the wave/time column. Must be numeric with
-integer-valued entries.}
+integer-valued entries. Deviations of up to \code{1e-8} from an integer
+are accepted and rounded for participation and duplicate checks.}
 
 \item{span}{Either \code{"core"} (window of \code{core_len} consecutive grid
 waves with the highest total respondent-wave coverage; exact

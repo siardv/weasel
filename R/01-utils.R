@@ -231,7 +231,8 @@ the <- new.env(parent = emptyenv())
 }
 
 .weasel_check_duplicates <- function(data, id, wave) {
-  dd <- .weasel_dedup_index(data[[id]], data[[wave]])
+  # accepted near-integer waves denote the same participation pair
+  dd <- .weasel_dedup_index(data[[id]], round(data[[wave]]))
   .weasel_warn_duplicates(dd$n_dup, id, wave)
 }
 
