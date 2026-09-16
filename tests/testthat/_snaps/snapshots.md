@@ -51,7 +51,7 @@
     Code
       cat(weasel_justify_subset(p, "anchored_strict", style = "concise"))
     Output
-      We selected a longitudinal analysis subset using the WEASEL framework (Wave-based Extraction and Selection for Longitudinal Data) (van den Bosch, 2026). The analysis window used the full wave grid from the first to the last grid wave. Within waves 1 to 8, we required observed endpoints to ensure temporal anchoring, required complete participation within the window (no missing waves) and restricted the missingness structure (at most 0 interior missing block(s), each no longer than 0 wave(s)). This strategy retained 2 respondent(s). In the resulting subset, mean within-window coverage was 1.000; endpoint coverage was 1.000.
+      We selected a longitudinal analysis subset using the WEASEL framework (Wave-based Extraction and Selection for Longitudinal Data) (van den Bosch, 2026). The analysis window used the full wave grid from the first to the last grid wave. Within waves 1 to 8, we required observed endpoints to ensure temporal anchoring, required complete participation within the window (no missing waves) and restricted the missingness structure (at most 0 interior missing block(s), each no longer than 0 wave(s)). This strategy retained 2 respondent(s). The planning population comprised 7 respondent(s) observed at least once within the analysis window, out of 7 distinct respondent(s) in the supplied data; retention figures are relative to this in-window population. In the resulting subset, mean within-window coverage was 1.000; endpoint coverage was 1.000.
 
 ---
 

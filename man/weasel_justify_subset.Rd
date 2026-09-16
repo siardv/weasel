@@ -72,6 +72,12 @@ method, that description is omitted.
 A tolerance of \code{Inf} is described as no separate limit on that dimension.
 Other criteria (including endpoint requirements and finite tolerances)
 still apply. Missing tolerance metadata is not treated as unlimited.
+
+All styles report the recorded planning population: respondents observed
+at least once within the analysis window, out of all distinct respondents
+in the supplied data. Retention is relative to the in-window population.
+This description uses stored plan metadata and does not require attached
+data. Older plans without population metadata omit the description.
 }
 \examples{
 d <- generate_weasel_dummy_data(n_ids = 200, n_times = 10, seed = 1)
