@@ -84,7 +84,14 @@ check_git <- function() {
     dir.create(file.path(probe_dir, parent), recursive = TRUE, showWarnings = FALSE)
   }
   input <- file.path(probe_dir, "paths.txt")
-  writeLines(paths, input)
+  # binary output prevents Windows from translating LF records to CRLF
+  writeBin(charToRaw(paste0(paths, "\n", collapse = "")), input)
+  # guard the input protocol before Git interprets any CR as part of a filename
+  input_bytes <- readBin(input, "raw", n = file.info(input)$size)
+  if (any(input_bytes == as.raw(13L)) ||
+      sum(input_bytes == as.raw(10L)) != length(paths)) {
+    stop("git path input must use one LF per path and no CR", call. = FALSE)
+  }
   actual <- suppressWarnings(system2(
     "git", c(git_args, "check-ignore", "--no-index", "--stdin"),
     stdin = input, stdout = TRUE, stderr = TRUE
