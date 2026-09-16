@@ -1,5 +1,9 @@
 # Development version
 
+* `weasel_plan()` now detects duplicate respondent-wave pairs after the same
+  wave rounding used for participation. Accepted near-integer values no longer
+  hide duplicates, including those outside the selected window. Selection,
+  fingerprints, and returned data are unchanged.
 * Scope and planning now share the internal preparation of respondent-wave
   participation. Selection, metrics, duplicate warnings, and saved-plan
   behavior are unchanged.
