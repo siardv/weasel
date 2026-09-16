@@ -9,14 +9,9 @@
 .weasel_id_metrics <- function(data, id_col, wave_col, span) {
   L <- length(span)
 
-  ok    <- !is.na(data[[id_col]]) & !is.na(data[[wave_col]])
-  ids0  <- data[[id_col]][ok]
-  w0    <- as.integer(round(data[[wave_col]][ok]))
-  in_sp <- w0 %in% span
-  ids_v <- ids0[in_sp]
-  w_v   <- w0[in_sp]
+  participation <- .weasel_prepare_participation(data, id_col, wave_col, span)
 
-  if (length(ids_v) == 0) {
+  if (length(participation$ids) == 0) {
     out <- data.frame(
       id           = character(0),
       n_present    = integer(0),
@@ -32,12 +27,7 @@
     return(out)
   }
 
-  dd    <- .weasel_dedup_index(ids_v, w_v)
-  ids_v <- ids_v[dd$idx]
-  w_v   <- w_v[dd$idx]
-
-  pos <- match(w_v, span)
-  out <- .weasel_gap_metrics(ids_v, pos, L)
+  out <- .weasel_gap_metrics(participation$ids, participation$positions, L)
 
   out$n_missing    <- L - out$n_present
   out$prop_present <- out$n_present / L

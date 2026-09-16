@@ -197,6 +197,25 @@ the <- new.env(parent = emptyenv())
   list(idx = o[!dup], n_dup = as.integer(sum(dup, na.rm = TRUE)))
 }
 
+# prepare participation from validated data and an already resolved grid;
+# preserve id types and levels, count each rounded pair once, and leave
+# reporting and empty-span handling to the caller
+.weasel_prepare_participation <- function(data, id_col, wave_col, span) {
+  ok    <- !is.na(data[[id_col]]) & !is.na(data[[wave_col]])
+  ids0  <- data[[id_col]][ok]
+  w0    <- as.integer(round(data[[wave_col]][ok]))
+  in_sp <- w0 %in% span
+  ids_v <- ids0[in_sp]
+  w_v   <- w0[in_sp]
+
+  dd    <- .weasel_dedup_index(ids_v, w_v)
+  ids_v <- ids_v[dd$idx]
+  w_v   <- w_v[dd$idx]
+
+  list(ids = ids_v, waves = w_v, positions = match(w_v, span),
+       n_dup = dd$n_dup)
+}
+
 # warn about duplicated (id, wave) rows; duplicates usually indicate a
 # join or merge problem, and both pipelines count each pair once
 .weasel_warn_duplicates <- function(n_dup, id, wave) {
