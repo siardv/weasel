@@ -378,17 +378,17 @@ weasel_compare_to_sentence <- function(cmp, digits = 3) {
 #'   coverage ties are resolved in favour of the earliest window with a
 #'   classed warning, `weasel_tied_windows`, and every candidate window
 #'   is stored in the returned `span_candidates` table) or `"full"`
-#'   (all waves). Ignored when explicit `lower`/`upper` bounds are
+#'   (the full wave grid). Ignored when explicit `lower`/`upper` bounds are
 #'   supplied; supplying both raises an error.
 #' @param core_len Integer; desired window length when `span = "core"`.
 #'   Values outside the feasible range (below 2, or above the number of
 #'   grid waves) are clamped to it, and the adjustment is reported in a
 #'   verbose-mode message rather than applied silently.
 #' @param lower,upper Optional explicit integer window bounds. When
-#'   either is supplied the analysis window is fixed a priori
-#'   (`span_reason = "explicit"`), which the justification text reports
-#'   as a design decision rather than an automatic selection. Bounds
-#'   are interpreted on the chosen `grid`; the effective bounds are the
+#'   either is supplied the plan records `span_reason = "explicit"`.
+#'   The justification text describes the bounds as user-supplied,
+#'   without inferring when or why they were chosen. Bounds are
+#'   interpreted on the chosen `grid`; the effective bounds are the
 #'   first and last grid waves inside the requested range.
 #' @param scenarios Optional data frame of custom scenarios with the
 #'   columns `scenario`, `require_endpoints`, `max_missing`,
@@ -455,7 +455,7 @@ weasel_compare_to_sentence <- function(cmp, digits = 3) {
 #'                                 seed = 1)
 #' pb <- weasel_plan(b, "id", "time", span = "full", grid = "observed")
 #'
-#' # a design-determined window: fix the bounds a priori
+#' # a user-supplied window: specify the bounds directly
 #' pe <- weasel_plan(d, "id", "time", lower = 3, upper = 8)
 #' pe$span_reason
 #'
@@ -483,8 +483,8 @@ weasel_plan <- function(data,
   )
 
   if (!is.null(lower) || !is.null(upper)) {
-    # explicit a-priori window: recorded as such, so justification text
-    # never attributes the window to an automatic rule
+    # record user-supplied bounds without inferring decision timing
+    # or attributing the window to an automatic rule
     if (span_given) {
       .weasel_stop("supply either span = \"core\"/\"full\" or explicit ",
                    "lower/upper bounds, not both.")

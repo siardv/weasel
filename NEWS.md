@@ -1,3 +1,19 @@
+# Development version
+
+* `weasel_justify_subset()` now preserves unlimited (`Inf`) tolerances and
+  describes each unlimited dimension without integer-coercion warnings or
+  dropped gap constraints. Finite constraints still appear in mixed cases,
+  and large finite limits no longer overflow during text generation. Existing
+  finite-limit wording, missing-metadata fallbacks, and respondent selection
+  are preserved.
+* All three `weasel_justify_subset()` styles now describe analysis-window
+  selection from the recorded rule. Explicit bounds are user-supplied without
+  an inferred a-priori decision; full spans use the full wave grid; core spans
+  maximize distinct respondent-wave coverage among equal-length contiguous
+  grid windows, with the earliest window chosen on ties. The descriptions no
+  longer imply that window selection establishes sample stability or
+  methodological superiority. Respondent selection is unchanged.
+
 # weasel 0.4.1
 
 A correctness release driven by an external adjustment report whose

@@ -170,10 +170,10 @@ plan_obj
 With `span = "core"` the package slides a window of `core_len`
 consecutive waves across the full wave range and picks the window with
 the highest average per-wave coverage; every candidate window is kept
-in `plan_obj$span_candidates`, and exact coverage ties warn. When the
-window is fixed by your study design, pass explicit `lower`/`upper`
-bounds instead of `span`; the plan then records the window as an
-a-priori decision and the justification text reports it as such.
+in `plan_obj$span_candidates`, and exact coverage ties warn. To supply
+your own window, pass explicit `lower`/`upper` bounds instead of `span`.
+The justification text describes these bounds as user-supplied,
+without inferring when or why they were chosen.
 
 ```{r}
 comparison <- weasel_compare_scenarios(plan_obj)

@@ -60,6 +60,19 @@ citation metadata (\code{utils::citation()}). A scenario that retains no
 respondents cannot be justified and raises a classed error
 (\code{weasel_error_empty_scenario}).
 }
+\details{
+All styles describe the recorded window-selection method: user-supplied
+bounds for explicit windows, the full wave grid for full spans, or the
+highest total count of distinct respondent-wave pairs among equal-length
+contiguous grid windows for core spans (earliest window on ties). These
+descriptions do not establish when bounds were chosen, sample stability,
+or methodological superiority. If the plan does not record a selection
+method, that description is omitted.
+
+A tolerance of \code{Inf} is described as no separate limit on that dimension.
+Other criteria (including endpoint requirements and finite tolerances)
+still apply. Missing tolerance metadata is not treated as unlimited.
+}
 \examples{
 d <- generate_weasel_dummy_data(n_ids = 200, n_times = 10, seed = 1)
 p <- weasel_plan(d, "id", "time", span = "core")

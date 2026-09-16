@@ -33,7 +33,7 @@ waves with the highest total respondent-wave coverage; exact
 coverage ties are resolved in favour of the earliest window with a
 classed warning, \code{weasel_tied_windows}, and every candidate window
 is stored in the returned \code{span_candidates} table) or \code{"full"}
-(all waves). Ignored when explicit \code{lower}/\code{upper} bounds are
+(the full wave grid). Ignored when explicit \code{lower}/\code{upper} bounds are
 supplied; supplying both raises an error.}
 
 \item{core_len}{Integer; desired window length when \code{span = "core"}.
@@ -74,10 +74,10 @@ before saving it with \code{saveRDS()}); those functions then need the
 data passed back in through their \code{data} argument.}
 
 \item{lower, upper}{Optional explicit integer window bounds. When
-either is supplied the analysis window is fixed a priori
-(\code{span_reason = "explicit"}), which the justification text reports
-as a design decision rather than an automatic selection. Bounds
-are interpreted on the chosen \code{grid}; the effective bounds are the
+either is supplied the plan records \code{span_reason = "explicit"}.
+The justification text describes the bounds as user-supplied,
+without inferring when or why they were chosen. Bounds are
+interpreted on the chosen \code{grid}; the effective bounds are the
 first and last grid waves inside the requested range.}
 }
 \value{
@@ -125,7 +125,7 @@ b <- generate_weasel_dummy_data(n_ids = 60, waves = seq(2008, 2020, 2),
                                 seed = 1)
 pb <- weasel_plan(b, "id", "time", span = "full", grid = "observed")
 
-# a design-determined window: fix the bounds a priori
+# a user-supplied window: specify the bounds directly
 pe <- weasel_plan(d, "id", "time", lower = 3, upper = 8)
 pe$span_reason
 
