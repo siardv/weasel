@@ -1,15 +1,16 @@
-# Development version
+# weasel 0.4.2
 
-* Core-window coverage scoring now uses the same internal participation
-  preparation as scope and plan metrics. Candidate coverage, window selection,
-  tie warnings, and saved-plan behavior are unchanged.
+This patch release corrects generated explanations and duplicate warnings,
+shares participation preparation across the selection workflows, and improves
+cross-platform verification. Respondent selection and saved-plan compatibility
+are preserved, with no new runtime dependencies or public API changes.
+
+## Fixes
+
 * `weasel_plan()` now detects duplicate respondent-wave pairs after the same
   wave rounding used for participation. Accepted near-integer values no longer
   hide duplicates, including those outside the selected window. Selection,
   fingerprints, and returned data are unchanged.
-* Scope and planning now share the internal preparation of respondent-wave
-  participation. Selection, metrics, duplicate warnings, and saved-plan
-  behavior are unchanged.
 * Concise `weasel_justify_subset()` output now reports the recorded planning
   population and retention denominator, consistently with the methods and
   extended styles. Saved plans work without attached data; older plans without
@@ -27,6 +28,23 @@
   grid windows, with the earliest window chosen on ties. The descriptions no
   longer imply that window selection establishes sample stability or
   methodological superiority. Respondent selection is unchanged.
+
+## Maintenance and verification
+
+* Scope metrics, plan metrics, and core-window coverage scoring now share the
+  internal preparation of respondent-wave participation. Candidate coverage,
+  window selection, tie warnings, and saved-plan behavior are unchanged.
+* Repository and source-package contents now follow explicit inclusion
+  policies, checked in CI. Generated vignette outputs remain included in
+  source packages.
+* The inclusion checker writes Git input with explicit LF line endings,
+  preventing carriage returns from being interpreted as filename characters
+  on Windows. Allowed paths and checks for disallowed paths are preserved.
+* RNG preservation tests compare and restore the full RNG configuration
+  across R versions, including the additional setting in R-devel.
+* Regression coverage now includes scope identifier representations,
+  planning-population text, unlimited tolerances, window descriptions,
+  normalized duplicate warnings, and shared participation preparation.
 
 # weasel 0.4.1
 
