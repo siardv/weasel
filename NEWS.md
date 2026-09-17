@@ -1,5 +1,8 @@
 # Development version
 
+* Core-window coverage scoring now uses the same internal participation
+  preparation as scope and plan metrics. Candidate coverage, window selection,
+  tie warnings, and saved-plan behavior are unchanged.
 * `weasel_plan()` now detects duplicate respondent-wave pairs after the same
   wave rounding used for participation. Accepted near-integer values no longer
   hide duplicates, including those outside the selected window. Selection,

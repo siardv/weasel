@@ -73,11 +73,8 @@
     )
   }
 
-  ok   <- !is.na(data[[id_col]]) & !is.na(data[[wave_col]])
-  ids0 <- data[[id_col]][ok]
-  w0   <- as.integer(round(data[[wave_col]][ok]))
-  dd   <- .weasel_dedup_index(ids0, w0)
-  cov  <- tabulate(match(w0[dd$idx], grid_full), nbins = W)
+  participation <- .weasel_prepare_participation(data, id_col, wave_col, grid_full)
+  cov  <- tabulate(participation$positions, nbins = W)
   cs   <- c(0L, cumsum(cov))
   win <- cs[(L + 1L):(W + 1L)] - cs[seq_len(W - L + 1L)]
   best_i <- which.max(win)
