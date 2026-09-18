@@ -221,3 +221,99 @@ test_that("attached-data workflows never consult the fingerprint", {
   expect_no_warning(weasel_apply(p_full, "strict"))
   expect_no_warning(weasel_summarize_subset(p_full, "strict"))
 })
+
+test_that("the v1 fingerprint keeps its saved representation", {
+  # fixed digest of the canonical v1 bytes for A: 1,2,3 and B: 1,2
+  expect_identical(
+    weasel:::.weasel_data_fingerprint(fp_d1(), "id", "time"),
+    list(n_rows = 5L, n_pairs = 5L, n_ids = 2L, id_type = "character",
+         waves = 1:3, pairs_per_wave = c(2L, 2L, 1L),
+         pair_hash = "bd26387f0367c182b8b6c7a36377e3d2")
+  )
+})
+
+test_that("saved plans detect changed assignments outside their window", {
+  d <- rbind(fp_d1(), data.frame(id = "B", time = 5, var1 = 22,
+                                 stringsAsFactors = FALSE))
+  p <- suppressMessages(
+    weasel_plan(d, "id", "time", lower = 1, upper = 3,
+                scenarios = fp_strict(), keep_data = FALSE)
+  )
+  f <- tempfile(fileext = ".rds")
+  on.exit(unlink(f), add = TRUE)
+  saveRDS(p, f)
+  p <- readRDS(f)
+
+  changed <- d
+  changed$id[6] <- "A"
+  changed_fp <- weasel:::.weasel_data_fingerprint(changed, "id", "time")
+  count_fields <- setdiff(names(p$fingerprint), "pair_hash")
+  expect_identical(p$fingerprint[count_fields], changed_fp[count_fields])
+  expect_false(identical(p$fingerprint$pair_hash, changed_fp$pair_hash))
+
+  legacy_counts <- p
+  legacy_counts$fingerprint$pair_hash <- NULL
+  no_fingerprint <- p
+  no_fingerprint$fingerprint <- NULL
+  for (reunite in list(weasel_apply, weasel_summarize_subset,
+                      weasel_selectivity)) {
+    expect_no_warning(expected <- reunite(p, "strict", data = d))
+    expect_warning(
+      actual <- reunite(p, "strict", data = changed),
+      "pair digest mismatch", class = "weasel_data_mismatch"
+    )
+    # the guard sees the full panel even though the selected output is unchanged
+    expect_identical(actual, expected)
+    for (legacy in list(legacy_counts, no_fingerprint)) {
+      expect_no_warning(actual <- reunite(legacy, "strict", data = changed))
+      expect_identical(actual, expected)
+    }
+  }
+})
+
+test_that("row counts and id types guard reunion even with an unchanged digest", {
+  d <- rbind(fp_d1(), data.frame(id = "B", time = 5, var1 = 22,
+                                 stringsAsFactors = FALSE))
+  p <- suppressMessages(
+    weasel_plan(d, "id", "time", lower = 1, upper = 3,
+                scenarios = fp_strict(), keep_data = FALSE)
+  )
+  d_factor <- d
+  d_factor$id <- factor(d_factor$id, levels = c("B", "A"))
+  variants <- list(
+    duplicate = rbind(d, d[6, , drop = FALSE]),
+    missing_key = rbind(d, data.frame(id = NA_character_, time = NA_real_,
+                                      var1 = NA_real_)),
+    factor_id = d_factor
+  )
+  changed_fields <- c(duplicate = "n_rows", missing_key = "n_rows",
+                      factor_id = "id_type")
+  legacy_counts <- p
+  legacy_counts$fingerprint$pair_hash <- NULL
+  no_fingerprint <- p
+  no_fingerprint$fingerprint <- NULL
+
+  for (variant in names(variants)) {
+    changed <- variants[[variant]]
+    changed_fp <- weasel:::.weasel_data_fingerprint(changed, "id", "time")
+    field <- changed_fields[[variant]]
+    unchanged <- setdiff(names(p$fingerprint), field)
+    expect_identical(p$fingerprint[unchanged], changed_fp[unchanged],
+                     info = variant)
+    expect_false(identical(p$fingerprint[[field]], changed_fp[[field]]),
+                 info = variant)
+
+    for (reunite in list(weasel_apply, weasel_summarize_subset,
+                        weasel_selectivity)) {
+      expect_no_warning(expected <- reunite(no_fingerprint, "strict",
+                                             data = changed))
+      for (guarded in list(p, legacy_counts)) {
+        expect_warning(
+          actual <- reunite(guarded, "strict", data = changed),
+          class = "weasel_data_mismatch"
+        )
+        expect_identical(actual, expected, info = variant)
+      }
+    }
+  }
+})
