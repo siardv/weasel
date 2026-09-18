@@ -53,6 +53,39 @@ test_that("wave column validation rejects factors and non-integers", {
   expect_identical(weasel:::.weasel_check_wave(c(3, 1, 2, NA)), 1:3)
 })
 
+test_that("wave validation rejects infinities and integer overflow cleanly", {
+  for (value in c(Inf, -Inf)) {
+    expect_no_warning(expect_error(
+      weasel:::.weasel_check_wave(c(1, value, NA, NaN), "time"),
+      "column 'time'.*finite", class = "weasel_error"
+    ))
+  }
+  limit <- .Machine$integer.max
+  for (value in c(limit + 1, -limit - 1, 1e20, -1e20)) {
+    expect_no_warning(expect_error(
+      weasel:::.weasel_check_wave(c(1, value, NA, NaN), "time"),
+      "column 'time'.*between", class = "weasel_error"
+    ))
+  }
+})
+
+test_that("wave validation preserves integer boundaries and rounding tolerance", {
+  limit <- .Machine$integer.max
+  waves <- c(limit, -limit, limit, 2 + 5e-9, -2 - 5e-9, 1e-8, NA, NaN)
+  expect_no_warning(expect_identical(
+    weasel:::.weasel_check_wave(waves, "time"),
+    c(-limit, -2L, 0L, 2L, limit)
+  ))
+  expect_no_warning(expect_error(
+    weasel:::.weasel_check_wave(c(1, 1.1e-8), "time"),
+    "column 'time'.*integer-valued", class = "weasel_error"
+  ))
+  expect_no_warning(expect_error(
+    weasel:::.weasel_check_wave(c(NA_real_, NaN), "time"),
+    "column 'time'.*no non-missing values", class = "weasel_error"
+  ))
+})
+
 test_that("weasel errors and warnings are classed conditions", {
   err <- tryCatch(weasel:::.weasel_check_wave(letters[1:3]),
                   error = function(e) e)

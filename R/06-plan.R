@@ -361,7 +361,8 @@ weasel_compare_to_sentence <- function(cmp, digits = 3) {
 #' @param id Name of the respondent-identifier column. Any atomic type
 #'   is supported.
 #' @param wave Name of the wave/time column. Must be numeric with
-#'   integer-valued entries. Deviations of up to `1e-8` from an integer
+#'   integer-valued entries. Non-missing values must be finite and between
+#'   -2147483647 and 2147483647. Deviations of up to `1e-8` from an integer
 #'   are accepted and rounded for participation and duplicate checks.
 #' @param span Either `"core"` (window of `core_len` consecutive grid
 #'   waves with the highest total respondent-wave coverage; exact

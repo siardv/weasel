@@ -1,3 +1,12 @@
+# weasel (development version)
+
+* Wave columns now reject infinite values and values outside the supported
+  integer range (-2147483647 to 2147483647) with a clear `weasel_error` before
+  conversion. This prevents coercion warnings and loss of out-of-range wave
+  values, including outside the selected window and when reusing saved plans.
+  Missing values and near-integer rounding retain their existing behavior;
+  `Inf` scenario tolerances remain supported.
+
 # weasel 0.4.2
 
 This patch release corrects generated explanations and duplicate warnings,

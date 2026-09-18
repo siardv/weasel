@@ -15,7 +15,9 @@
 #' @param id Name of the respondent-identifier column. Any atomic type
 #'   (integer, character, ...) is supported.
 #' @param wave Name of the wave/time column. Must be numeric with
-#'   integer-valued entries.
+#'   integer-valued entries. Non-missing values must be finite and between
+#'   -2147483647 and 2147483647. Deviations of up to `1e-8` from an integer
+#'   are accepted and rounded for participation and duplicate checks.
 #' @param min_present Single integer (default 1); respondents with
 #'   fewer observed waves inside the span are dropped by
 #'   [weasel_reshape_to_wide()]. The default keeps every respondent

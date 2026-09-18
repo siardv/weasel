@@ -126,10 +126,19 @@ the <- new.env(parent = emptyenv())
   }
   ok <- x[!is.na(x)]
   if (length(ok) == 0) .weasel_stop("column '", name, "' has no non-missing values.")
-  if (any(abs(ok - round(ok)) > 1e-8)) {
+  if (any(!is.finite(ok))) {
+    .weasel_stop("column '", name, "' must contain finite wave numbers.")
+  }
+  rounded <- round(ok)
+  if (any(abs(ok - rounded) > 1e-8)) {
     .weasel_stop("column '", name, "' must contain integer-valued wave numbers.")
   }
-  sort(unique(as.integer(round(ok))))
+  # the most negative integer is reserved for NA, so usable limits are symmetric
+  if (any(rounded < -.Machine$integer.max | rounded > .Machine$integer.max)) {
+    .weasel_stop("column '", name, "' must contain wave numbers between ",
+                 -.Machine$integer.max, " and ", .Machine$integer.max, ".")
+  }
+  sort(unique(as.integer(rounded)))
 }
 
 # shared entry validation for both pipelines
