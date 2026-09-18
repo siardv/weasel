@@ -153,3 +153,63 @@ test_that("integer-valued doubles are still accepted everywhere", {
   s <- weasel_sensitivity(p, max_missing = c(0, 1, 2))
   expect_gt(nrow(s), 0)
 })
+
+test_that("invalid waves fail before window filtering or saved-plan guards", {
+  on.exit(weasel_clear_scope(), add = TRUE)
+  d <- data.frame(id = c("A", "A", "A", "B", "B"),
+                  time = c(1, 2, 3, 1, 2), var1 = c(10, 11, 12, 20, 21))
+  p <- weasel_plan(d, "id", "time", lower = 1, upper = 3, keep_data = FALSE)
+  legacy <- p
+  legacy$fingerprint$pair_hash <- NULL
+  no_fingerprint <- p
+  no_fingerprint$fingerprint <- NULL
+
+  for (value in c(Inf, .Machine$integer.max + 1)) {
+    message <- if (is.finite(value)) "between" else "finite"
+    message <- paste0("column 'time'.*", message)
+    for (row_id in c("B", NA_character_)) {
+      bad <- rbind(d, data.frame(id = row_id, time = value, var1 = 22))
+      expect_no_warning(expect_error(
+        set_weasel_scope(bad, "id", "time", lower = 1, upper = 3),
+        message, class = "weasel_error"
+      ))
+      expect_no_warning(expect_error(
+        weasel_plan(bad, "id", "time", lower = 1, upper = 3),
+        message, class = "weasel_error"
+      ))
+      for (saved in list(p, legacy, no_fingerprint)) {
+        for (reunite in list(weasel_apply, weasel_summarize_subset,
+                            weasel_selectivity)) {
+          expect_no_warning(expect_error(
+            reunite(saved, "anchored_strict", data = bad),
+            message, class = "weasel_error"
+          ))
+        }
+      }
+    }
+  }
+})
+
+test_that("both pipelines accept representable wave endpoints on observed grids", {
+  on.exit(weasel_clear_scope(), add = TRUE)
+  limit <- .Machine$integer.max
+  waves <- c(-limit, 0L, limit)
+  d <- data.frame(id = c("A", "A", "A", "B", "B"),
+                  time = waves[c(1:3, 1:2)], var1 = c(10, 11, 12, 20, 21))
+  expect_no_warning(
+    p <- weasel_plan(d, "id", "time", span = "full", grid = "observed")
+  )
+  expect_identical(p$span, waves)
+  expect_identical(p$plan$ids[[1]], "A")
+  expect_no_warning(
+    env <- set_weasel_scope(d, "id", "time", grid = "observed",
+                            min_present = 3, require_endpoints = TRUE)
+  )
+  expect_no_warning(pivot <- weasel_reshape_to_wide())
+  expect_identical(env$span, waves)
+  expect_identical(pivot$id, "A")
+  expect_no_warning(
+    selected <- weasel_apply(p, "anchored_strict", data = d)
+  )
+  expect_identical(selected$time, waves)
+})

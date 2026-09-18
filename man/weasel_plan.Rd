@@ -28,7 +28,8 @@ rows outside the selected window.}
 is supported.}
 
 \item{wave}{Name of the wave/time column. Must be numeric with
-integer-valued entries. Deviations of up to \code{1e-8} from an integer
+integer-valued entries. Non-missing values must be finite and between
+-2147483647 and 2147483647. Deviations of up to \code{1e-8} from an integer
 are accepted and rounded for participation and duplicate checks.}
 
 \item{span}{Either \code{"core"} (window of \code{core_len} consecutive grid
