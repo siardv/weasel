@@ -22,12 +22,14 @@ generate_weasel_dummy_data(
 )
 }
 \arguments{
-\item{n_ids}{Number of respondents.}
+\item{n_ids}{Number of respondents; an integer from 1 to 2147483647.}
 
-\item{n_times}{Number of time points (waves). Ignored when \code{waves}
-is supplied.}
+\item{n_times}{Number of time points (waves); an integer from 0 to
+2147483647, validated before \code{waves} replaces its value. When \code{waves}
+is not supplied, \code{n_times} must be greater than 2.}
 
-\item{n_vars}{Number of outcome variables to generate.}
+\item{n_vars}{Number of outcome variables to generate; an integer
+from 1 to 2147483647.}
 
 \item{prop_random}{Probability that any given (respondent, wave)
 observation is skipped at random. Like every \code{prop_*} parameter,
@@ -56,7 +58,8 @@ min/max duration of block missingness.}
 \item{prop_item_missing}{Probability that an individual outcome value
 on an observed row is \code{NA} (item nonresponse).}
 
-\item{id_start}{Starting integer for respondent identifiers.}
+\item{id_start}{Starting integer for respondent identifiers; must be
+between -2147483647 and 2147483647.}
 
 \item{waves}{Optional integer vector of wave labels, for example
 \code{seq(2008, 2032, by = 2)} for a biennial schedule. When supplied it
@@ -65,10 +68,11 @@ positions of this schedule, and the returned \code{time} column contains
 these labels. Analyse such data with \code{grid = "observed"} in
 \code{\link[=weasel_plan]{weasel_plan()}} or \code{\link[=set_weasel_scope]{set_weasel_scope()}}.}
 
-\item{seed}{Random seed; a single integer-valued number (fractional
-and non-numeric values are rejected before \code{set.seed()} is
-reached). If \code{NULL}, a seed is drawn and reported so the data set
-can be regenerated. A given seed reproduces the same panel
+\item{seed}{Random seed; a single integer-valued number between
+-2147483647 and 2147483647 (fractional and non-numeric values are
+rejected before \code{set.seed()} is reached). If \code{NULL}, a seed is drawn
+and reported so the data set can be regenerated. A given seed
+reproduces the same panel
 regardless of the caller's \code{RNGkind()}; see Details.}
 }
 \value{

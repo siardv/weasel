@@ -9,8 +9,10 @@
 #' @param x A data frame to print.
 #' @param title Optional character string displayed as a heading above
 #'   the table.
-#' @param digits Integer; number of decimal places for numeric columns.
-#' @param n Optional integer; maximum number of rows to show.
+#' @param digits Integer from 0 to 2147483647; number of decimal places
+#'   for numeric columns.
+#' @param n Optional integer from 0 to 2147483647; maximum number of
+#'   rows to show. `NULL` shows all rows.
 #'
 #' @return Invisibly returns the displayed (possibly truncated and
 #'   rounded) data frame, without hidden list columns.

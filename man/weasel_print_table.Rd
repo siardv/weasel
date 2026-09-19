@@ -12,9 +12,11 @@ weasel_print_table(x, title = NULL, digits = 3, n = NULL)
 \item{title}{Optional character string displayed as a heading above
 the table.}
 
-\item{digits}{Integer; number of decimal places for numeric columns.}
+\item{digits}{Integer from 0 to 2147483647; number of decimal places
+for numeric columns.}
 
-\item{n}{Optional integer; maximum number of rows to show.}
+\item{n}{Optional integer from 0 to 2147483647; maximum number of
+rows to show. \code{NULL} shows all rows.}
 }
 \value{
 Invisibly returns the displayed (possibly truncated and

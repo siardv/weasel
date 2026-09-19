@@ -34,31 +34,34 @@ integer-valued entries. Non-missing values must be finite and between
 -2147483647 and 2147483647. Deviations of up to \code{1e-8} from an integer
 are accepted and rounded for participation and duplicate checks.}
 
-\item{min_present}{Single integer (default 1); respondents with
-fewer observed waves inside the span are dropped by
+\item{min_present}{Single integer from 1 to 2147483647 (default 1);
+respondents with fewer observed waves inside the span are dropped by
 \code{\link[=weasel_reshape_to_wide]{weasel_reshape_to_wide()}}. The default keeps every respondent
 with at least one observed wave, so exploration shows the full
 participation landscape unless you narrow it.}
 
-\item{max_missing}{Optional integer; maximum allowed number of
-missing waves inside the span. \code{NULL} (default) applies no
-constraint.}
+\item{max_missing}{Optional integer from 0 to 2147483647; maximum
+allowed number of missing waves inside the span. \code{NULL} (default)
+applies no constraint.}
 
-\item{max_gap_len}{Optional integer; maximum allowed length of an
-interior gap (a run of missing waves strictly between a
-respondent's first and last observed wave inside the span).
+\item{max_gap_len}{Optional integer from 0 to 2147483647; maximum
+allowed length of an interior gap (a run of missing waves strictly
+between a respondent's first and last observed wave inside the span).
 \code{NULL} (default) applies no constraint.}
 
-\item{n_gap_max}{Optional integer; maximum allowed number of
-interior gaps. \code{NULL} (default) applies no constraint.}
+\item{n_gap_max}{Optional integer from 0 to 2147483647; maximum
+allowed number of interior gaps. \code{NULL} (default) applies no
+constraint.}
 
 \item{require_endpoints}{If \code{TRUE}, only respondents observed at
 both the first and last wave of the span are kept. Default
 \code{FALSE}.}
 
-\item{lower}{Optional lower bound of the wave range.}
+\item{lower}{Optional lower bound of the wave range; an integer
+between -2147483647 and 2147483647.}
 
-\item{upper}{Optional upper bound of the wave range.}
+\item{upper}{Optional upper bound of the wave range; an integer
+between -2147483647 and 2147483647.}
 
 \item{grid}{How the wave grid inside the span is defined.
 \code{"consecutive"} (default) treats every integer between \code{lower} and

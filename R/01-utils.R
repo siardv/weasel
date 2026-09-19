@@ -84,7 +84,11 @@ the <- new.env(parent = emptyenv())
     .weasel_stop(name, " must be a single non-negative integer ",
                  "(fractional values are rejected, not truncated).")
   }
-  as.integer(round(x))
+  rounded <- round(x)
+  if (rounded > .Machine$integer.max) {
+    .weasel_stop(name, " must be between 0 and ", .Machine$integer.max, ".")
+  }
+  as.integer(rounded)
 }
 
 # single probability in [0, 1]; the scalar sibling of
@@ -109,7 +113,12 @@ the <- new.env(parent = emptyenv())
     .weasel_stop(name, " must be a single integer-valued number ",
                  "(fractional values are rejected, not rounded).")
   }
-  as.integer(round(x))
+  rounded <- round(x)
+  if (rounded < -.Machine$integer.max || rounded > .Machine$integer.max) {
+    .weasel_stop(name, " must be between ", -.Machine$integer.max,
+                 " and ", .Machine$integer.max, ".")
+  }
+  as.integer(rounded)
 }
 
 # validate a wave column: must be numeric and integer-valued
