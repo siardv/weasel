@@ -44,7 +44,9 @@
 #' @param prop_item_missing Probability that an individual outcome value
 #'   on an observed row is `NA` (item nonresponse).
 #' @param id_start Starting integer for respondent identifiers; must be
-#'   between -2147483647 and 2147483647.
+#'   between -2147483647 and 2147483647. The final identifier,
+#'   `id_start + n_ids - 1`, must not exceed 2147483647. Invalid ID ranges
+#'   are rejected before random draws.
 #' @param waves Optional integer vector of wave labels, for example
 #'   `seq(2008, 2032, by = 2)` for a biennial schedule. When supplied it
 #'   overrides `n_times`; the participation mechanisms operate on the
@@ -147,6 +149,13 @@ generate_weasel_dummy_data <- function(n_ids = 1000,
     .weasel_stop("block_duration_range must be two integers >= 1.")
   }
 
+  # double arithmetic avoids overflow when the final integer ID is still valid
+  id_end <- as.double(id_start) + n_ids - 1
+  if (id_end > .Machine$integer.max) {
+    .weasel_stop("id_start and n_ids must define an ID range ending at or below ",
+                 .Machine$integer.max, ".")
+  }
+
   .weasel_with_preserved_seed({
     # pin the sampler so a given seed reproduces the same panel under any
     # caller RNGkind(); the caller's state and kind are restored on exit
@@ -158,7 +167,7 @@ generate_weasel_dummy_data <- function(n_ids = 1000,
 
     n_ids   <- as.integer(n_ids)
     n_times <- as.integer(n_times)
-    ids_vec <- seq.int(id_start, id_start + n_ids - 1)
+    ids_vec <- seq.int(id_start, id_end)
 
     # participation matrix: TRUE = respondent observed at that wave
     present <- matrix(TRUE, nrow = n_ids, ncol = n_times)

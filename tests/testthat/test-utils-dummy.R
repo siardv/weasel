@@ -166,6 +166,60 @@ test_that("dummy data is reproducible and RNG-neutral", {
   expect_identical(x1, x2)
 })
 
+test_that("dummy data preserves tiny ID intervals at integer boundaries", {
+  limit <- .Machine$integer.max
+  intervals <- list(c(-limit, -limit + 1L), c(-1L, 0L, 1L), 0L,
+                    limit, c(limit - 1L, limit))
+  for (ids in intervals) {
+    reference <- generate_weasel_dummy_data(
+      n_ids = length(ids), n_times = 4, n_vars = 2, id_start = 1, seed = 7
+    )
+    expect_no_warning(generated <- generate_weasel_dummy_data(
+      n_ids = length(ids), n_times = 4, n_vars = 2,
+      id_start = ids[1L], seed = 7
+    ))
+    expect_identical(generated$id, ids[reference$id])
+    expect_identical(unique(generated$id), ids)
+    expect_identical(generated[-1L], reference[-1L])
+  }
+})
+
+test_that("invalid ID intervals fail before seed messages and preserve RNG state", {
+  old <- options(weasel.verbose = TRUE)
+  old_kind <- RNGkind()
+  had_seed <- exists(".Random.seed", envir = globalenv(), inherits = FALSE)
+  old_seed <- if (had_seed) get(".Random.seed", envir = globalenv())
+  on.exit({
+    options(old)
+    suppressWarnings(do.call(RNGkind, as.list(old_kind)))
+    if (had_seed) {
+      assign(".Random.seed", old_seed, envir = globalenv())
+    } else if (exists(".Random.seed", envir = globalenv(), inherits = FALSE)) {
+      rm(".Random.seed", envir = globalenv())
+    }
+  }, add = TRUE)
+  RNGkind("Wichmann-Hill", "Box-Muller", sample.kind = "Rejection")
+  set.seed(61)
+  before_seed <- .Random.seed
+  before_kind <- RNGkind()
+  limit <- .Machine$integer.max
+  for (has_seed in c(TRUE, FALSE)) {
+    if (!has_seed) rm(".Random.seed", envir = globalenv())
+    for (n_ids in 2:3) {
+      expect_no_message(expect_no_warning(expect_error(
+        generate_weasel_dummy_data(n_ids = n_ids, n_times = 3, n_vars = 1,
+                                   id_start = limit - n_ids + 2L),
+        "id_start.*n_ids.*2147483647", class = "weasel_error"
+      )))
+      expect_identical(
+        exists(".Random.seed", envir = globalenv(), inherits = FALSE), has_seed
+      )
+      if (has_seed) expect_identical(.Random.seed, before_seed)
+      expect_identical(RNGkind(), before_kind)
+    }
+  }
+})
+
 test_that("dummy data is invariant to the caller's RNG kind", {
   d_default <- generate_weasel_dummy_data(n_ids = 20, n_times = 6, seed = 42)
 

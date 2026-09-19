@@ -1,5 +1,9 @@
 # weasel (development version)
 
+* Dummy-data generation now handles valid ID ranges ending at 2147483647
+  without intermediate integer overflow. Ranges extending beyond the supported
+  integer limit fail with a clear `weasel_error` before generation. Ordinary
+  seeded output and RNG behavior are unchanged.
 * Scalar count and bound arguments now reject values outside their supported
   integer ranges with a parameter-naming `weasel_error` before conversion.
   This prevents coercion warnings, missing-value table output and invalid
