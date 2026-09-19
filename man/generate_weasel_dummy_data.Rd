@@ -59,7 +59,9 @@ min/max duration of block missingness.}
 on an observed row is \code{NA} (item nonresponse).}
 
 \item{id_start}{Starting integer for respondent identifiers; must be
-between -2147483647 and 2147483647.}
+between -2147483647 and 2147483647. The final identifier,
+\code{id_start + n_ids - 1}, must not exceed 2147483647. Invalid ID ranges
+are rejected before random draws.}
 
 \item{waves}{Optional integer vector of wave labels, for example
 \code{seq(2008, 2032, by = 2)} for a biennial schedule. When supplied it
