@@ -321,3 +321,147 @@ test_that("tie_tolerance must be a single non-negative number", {
   cmp_inf <- weasel_compare_scenarios(p, tie_tolerance = Inf)
   expect_true(all(cmp_inf$near_tie[!is.na(cmp_inf$score)]))
 })
+
+# ---- scalar integer range -------------------------------------------------
+
+test_that("overflowing scope and plan parameters fail before scope mutation", {
+  d <- data.frame(id = c("A", "A", "A", "B"), time = c(1, 2, 3, 2))
+  state <- weasel:::the
+  old_scope <- state$scope
+  on.exit(state$scope <- old_scope, add = TRUE)
+  scope <- suppressMessages(set_weasel_scope(d, "id", "time"))
+  contents <- as.list(scope, all.names = TRUE)
+  overflow <- as.double(.Machine$integer.max) + 1
+  cases <- list(
+    set_weasel_scope = list(lower = -overflow, upper = overflow,
+                            min_present = overflow, max_missing = overflow,
+                            max_gap_len = overflow, n_gap_max = overflow),
+    weasel_plan = list(lower = -overflow, upper = overflow,
+                       core_len = overflow)
+  )
+  for (entry in names(cases)) {
+    for (arg in names(cases[[entry]])) {
+      state$scope <- scope
+      args <- list(data = d, id = "id", wave = "time", grid = "observed")
+      args[[arg]] <- cases[[entry]][[arg]]
+      expect_no_warning(expect_error(
+        do.call(get(entry), args), paste0(arg, ".*between"),
+        class = "weasel_error"
+      ))
+      expect_identical(state$scope, scope)
+      expect_identical(as.list(state$scope, all.names = TRUE), contents)
+    }
+  }
+})
+
+test_that("overflowing table parameters cannot print or return an NA view", {
+  old <- options(weasel.verbose = TRUE)
+  on.exit(options(old), add = TRUE)
+  d <- data.frame(x = c(1.25, 2.75))
+  limit <- as.double(.Machine$integer.max)
+  for (arg in c("digits", "n")) {
+    args <- list(x = d, title = "Preview")
+    args[[arg]] <- limit + 1
+    result <- d
+    output <- capture.output(expect_no_message(expect_no_warning(expect_error(
+      result <- do.call(weasel_print_table, args), paste0(arg, ".*between"),
+      class = "weasel_error"
+    ))))
+    expect_identical(output, character())
+    expect_identical(result, d)
+  }
+  invisible(capture.output(expect_no_warning(
+    result <- weasel_print_table(d, digits = limit, n = limit)
+  )))
+  expect_identical(result, d)
+})
+
+test_that("generator scalar overflow preserves full RNG state", {
+  old <- options(weasel.verbose = TRUE)
+  old_kind <- RNGkind()
+  had_seed <- exists(".Random.seed", envir = globalenv(), inherits = FALSE)
+  old_seed <- if (had_seed) get(".Random.seed", envir = globalenv())
+  on.exit({
+    options(old)
+    suppressWarnings(do.call(RNGkind, as.list(old_kind)))
+    if (had_seed) {
+      assign(".Random.seed", old_seed, envir = globalenv())
+    } else if (exists(".Random.seed", envir = globalenv(), inherits = FALSE)) {
+      rm(".Random.seed", envir = globalenv())
+    }
+  }, add = TRUE)
+  RNGkind("Wichmann-Hill", "Box-Muller", sample.kind = "Rejection")
+  set.seed(61)
+  before_seed <- .Random.seed
+  before_kind <- RNGkind()
+  limit <- as.double(.Machine$integer.max)
+  for (arg in c("n_ids", "n_times", "n_vars", "id_start", "seed")) {
+    values <- if (arg %in% c("id_start", "seed")) {
+      c(-limit - 1, limit + 1)
+    } else {
+      limit + 1
+    }
+    for (value in values) {
+      args <- list(n_ids = 2, n_times = 3, n_vars = 1, seed = 7)
+      args[[arg]] <- value
+      expect_no_message(expect_no_warning(expect_error(
+        do.call(generate_weasel_dummy_data, args), paste0(arg, ".*between"),
+        class = "weasel_error"
+      )))
+      expect_identical(.Random.seed, before_seed)
+      expect_identical(RNGkind(), before_kind)
+    }
+  }
+  # a schedule overrides the value only after n_times has been validated
+  expect_no_message(expect_no_warning(expect_error(
+    generate_weasel_dummy_data(n_ids = 2, n_times = limit + 1, n_vars = 1,
+                               waves = 1:3, seed = 7),
+    "n_times.*between", class = "weasel_error"
+  )))
+  expect_identical(.Random.seed, before_seed)
+  expect_identical(RNGkind(), before_kind)
+
+  for (seed in c(-limit, limit)) {
+    expect_no_warning(generated <- suppressMessages(
+      generate_weasel_dummy_data(n_ids = 2, n_times = 3, n_vars = 1,
+                                 seed = seed)
+    ))
+    expect_identical(length(unique(generated$id)), 2L)
+    expect_identical(.Random.seed, before_seed)
+    expect_identical(RNGkind(), before_kind)
+  }
+  rm(".Random.seed", envir = globalenv())
+  expect_no_message(expect_no_warning(expect_error(
+    generate_weasel_dummy_data(n_ids = 2, n_times = 3, n_vars = 1,
+                               seed = limit + 1),
+    "seed.*between", class = "weasel_error"
+  )))
+  expect_false(exists(".Random.seed", envir = globalenv(), inherits = FALSE))
+  expect_identical(RNGkind(), before_kind)
+})
+
+test_that("representable scalar limits work on a small observed grid", {
+  d <- data.frame(id = c("A", "A", "A", "B"), time = c(1, 2, 3, 2))
+  limit <- .Machine$integer.max
+  state <- weasel:::the
+  old_scope <- state$scope
+  on.exit(state$scope <- old_scope, add = TRUE)
+  expect_no_warning(scope <- suppressMessages(
+    set_weasel_scope(d, "id", "time", lower = -limit, upper = limit,
+                     max_missing = limit, max_gap_len = limit,
+                     n_gap_max = limit, grid = "observed")
+  ))
+  expect_identical(c(scope$lower, scope$upper), c(-limit, limit))
+  expect_no_warning(suppressMessages(evaluate_weasel_scope()))
+  expect_no_warning(suppressMessages(weasel_reshape_to_wide()))
+  expect_no_warning(explicit <- suppressMessages(
+    weasel_plan(d, "id", "time", lower = -limit, upper = limit,
+                 grid = "observed")
+  ))
+  expect_no_warning(core <- suppressMessages(
+    weasel_plan(d, "id", "time", core_len = limit, grid = "observed")
+  ))
+  expect_identical(explicit$span, 1:3)
+  expect_identical(core$span, explicit$span)
+  expect_identical(core$id_metrics, explicit$id_metrics)
+})

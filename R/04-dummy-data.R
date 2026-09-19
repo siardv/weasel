@@ -18,10 +18,12 @@
 #' reproduces the same panel even when the caller uses a non-default
 #' sampler (for example `sample.kind = "Rounding"`).
 #'
-#' @param n_ids Number of respondents.
-#' @param n_times Number of time points (waves). Ignored when `waves`
-#'   is supplied.
-#' @param n_vars Number of outcome variables to generate.
+#' @param n_ids Number of respondents; an integer from 1 to 2147483647.
+#' @param n_times Number of time points (waves); an integer from 0 to
+#'   2147483647, validated before `waves` replaces its value. When `waves`
+#'   is not supplied, `n_times` must be greater than 2.
+#' @param n_vars Number of outcome variables to generate; an integer
+#'   from 1 to 2147483647.
 #' @param prop_random Probability that any given (respondent, wave)
 #'   observation is skipped at random. Like every `prop_*` parameter,
 #'   it must be a single number in `[0, 1]`; invalid values fail
@@ -41,17 +43,19 @@
 #'   min/max duration of block missingness.
 #' @param prop_item_missing Probability that an individual outcome value
 #'   on an observed row is `NA` (item nonresponse).
-#' @param id_start Starting integer for respondent identifiers.
+#' @param id_start Starting integer for respondent identifiers; must be
+#'   between -2147483647 and 2147483647.
 #' @param waves Optional integer vector of wave labels, for example
 #'   `seq(2008, 2032, by = 2)` for a biennial schedule. When supplied it
 #'   overrides `n_times`; the participation mechanisms operate on the
 #'   positions of this schedule, and the returned `time` column contains
 #'   these labels. Analyse such data with `grid = "observed"` in
 #'   [weasel_plan()] or [set_weasel_scope()].
-#' @param seed Random seed; a single integer-valued number (fractional
-#'   and non-numeric values are rejected before `set.seed()` is
-#'   reached). If `NULL`, a seed is drawn and reported so the data set
-#'   can be regenerated. A given seed reproduces the same panel
+#' @param seed Random seed; a single integer-valued number between
+#'   -2147483647 and 2147483647 (fractional and non-numeric values are
+#'   rejected before `set.seed()` is reached). If `NULL`, a seed is drawn
+#'   and reported so the data set can be regenerated. A given seed
+#'   reproduces the same panel
 #'   regardless of the caller's `RNGkind()`; see Details.
 #'
 #' @return A data frame in long format with columns `id`, `time`, and

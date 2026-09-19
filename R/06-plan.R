@@ -371,12 +371,13 @@ weasel_compare_to_sentence <- function(cmp, digits = 3) {
 #'   is stored in the returned `span_candidates` table) or `"full"`
 #'   (the full wave grid). Ignored when explicit `lower`/`upper` bounds are
 #'   supplied; supplying both raises an error.
-#' @param core_len Integer; desired window length when `span = "core"`.
-#'   Values outside the feasible range (below 2, or above the number of
-#'   grid waves) are clamped to it, and the adjustment is reported in a
-#'   verbose-mode message rather than applied silently.
-#' @param lower,upper Optional explicit integer window bounds. When
-#'   either is supplied the plan records `span_reason = "explicit"`.
+#' @param core_len Desired window length when `span = "core"`; `NULL`
+#'   uses the default of 6. Other values must be single integers from 0 to
+#'   2147483647 before clamping to the feasible range (2 through the number
+#'   of grid waves). Any adjustment is reported in a verbose-mode message.
+#' @param lower,upper Optional explicit integer window bounds between
+#'   -2147483647 and 2147483647. When either is supplied the plan records
+#'   `span_reason = "explicit"`.
 #'   The justification text describes the bounds as user-supplied,
 #'   without inferring when or why they were chosen. Bounds are
 #'   interpreted on the chosen `grid`; the effective bounds are the

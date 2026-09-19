@@ -18,25 +18,28 @@
 #'   integer-valued entries. Non-missing values must be finite and between
 #'   -2147483647 and 2147483647. Deviations of up to `1e-8` from an integer
 #'   are accepted and rounded for participation and duplicate checks.
-#' @param min_present Single integer (default 1); respondents with
-#'   fewer observed waves inside the span are dropped by
+#' @param min_present Single integer from 1 to 2147483647 (default 1);
+#'   respondents with fewer observed waves inside the span are dropped by
 #'   [weasel_reshape_to_wide()]. The default keeps every respondent
 #'   with at least one observed wave, so exploration shows the full
 #'   participation landscape unless you narrow it.
-#' @param max_missing Optional integer; maximum allowed number of
-#'   missing waves inside the span. `NULL` (default) applies no
-#'   constraint.
-#' @param max_gap_len Optional integer; maximum allowed length of an
-#'   interior gap (a run of missing waves strictly between a
-#'   respondent's first and last observed wave inside the span).
+#' @param max_missing Optional integer from 0 to 2147483647; maximum
+#'   allowed number of missing waves inside the span. `NULL` (default)
+#'   applies no constraint.
+#' @param max_gap_len Optional integer from 0 to 2147483647; maximum
+#'   allowed length of an interior gap (a run of missing waves strictly
+#'   between a respondent's first and last observed wave inside the span).
 #'   `NULL` (default) applies no constraint.
-#' @param n_gap_max Optional integer; maximum allowed number of
-#'   interior gaps. `NULL` (default) applies no constraint.
+#' @param n_gap_max Optional integer from 0 to 2147483647; maximum
+#'   allowed number of interior gaps. `NULL` (default) applies no
+#'   constraint.
 #' @param require_endpoints If `TRUE`, only respondents observed at
 #'   both the first and last wave of the span are kept. Default
 #'   `FALSE`.
-#' @param lower Optional lower bound of the wave range.
-#' @param upper Optional upper bound of the wave range.
+#' @param lower Optional lower bound of the wave range; an integer
+#'   between -2147483647 and 2147483647.
+#' @param upper Optional upper bound of the wave range; an integer
+#'   between -2147483647 and 2147483647.
 #' @param size,gap,n_gap Deprecated aliases (classed warning
 #'   `weasel_deprecated`): use `min_present` (for `size`, whose minimum
 #'   is used), `max_gap_len` (for `gap`), and `n_gap_max` (for

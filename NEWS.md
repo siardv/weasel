@@ -1,5 +1,10 @@
 # weasel (development version)
 
+* Scalar count and bound arguments now reject values outside their supported
+  integer ranges with a parameter-naming `weasel_error` before conversion.
+  This prevents coercion warnings, missing-value table output and invalid
+  stored scope settings. Existing parameter defaults, near-integer rounding,
+  generator RNG behavior and separate scenario-table tolerances are preserved.
 * Wave columns now reject infinite values and values outside the supported
   integer range (-2147483647 to 2147483647) with a clear `weasel_error` before
   conversion. This prevents coercion warnings and loss of out-of-range wave

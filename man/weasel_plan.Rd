@@ -40,10 +40,10 @@ is stored in the returned \code{span_candidates} table) or \code{"full"}
 (the full wave grid). Ignored when explicit \code{lower}/\code{upper} bounds are
 supplied; supplying both raises an error.}
 
-\item{core_len}{Integer; desired window length when \code{span = "core"}.
-Values outside the feasible range (below 2, or above the number of
-grid waves) are clamped to it, and the adjustment is reported in a
-verbose-mode message rather than applied silently.}
+\item{core_len}{Desired window length when \code{span = "core"}; \code{NULL}
+uses the default of 6. Other values must be single integers from 0 to
+2147483647 before clamping to the feasible range (2 through the number
+of grid waves). Any adjustment is reported in a verbose-mode message.}
 
 \item{scenarios}{Optional data frame of custom scenarios with the
 columns \code{scenario}, \code{require_endpoints}, \code{max_missing},
@@ -77,8 +77,9 @@ it. Set to \code{FALSE} to keep the plan object small (for example
 before saving it with \code{saveRDS()}); those functions then need the
 data passed back in through their \code{data} argument.}
 
-\item{lower, upper}{Optional explicit integer window bounds. When
-either is supplied the plan records \code{span_reason = "explicit"}.
+\item{lower, upper}{Optional explicit integer window bounds between
+-2147483647 and 2147483647. When either is supplied the plan records
+\code{span_reason = "explicit"}.
 The justification text describes the bounds as user-supplied,
 without inferring when or why they were chosen. Bounds are
 interpreted on the chosen \code{grid}; the effective bounds are the

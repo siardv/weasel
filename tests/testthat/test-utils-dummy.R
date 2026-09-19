@@ -86,6 +86,50 @@ test_that("wave validation preserves integer boundaries and rounding tolerance",
   ))
 })
 
+test_that("scalar integer validators reject overflow before conversion", {
+  limit <- .Machine$integer.max
+  for (value in c(limit + 1, 1e100)) {
+    expect_no_warning(expect_error(
+      weasel:::.weasel_check_count(value, "count"),
+      "count.*between 0 and 2147483647", class = "weasel_error"
+    ))
+  }
+  for (value in c(limit + 1, -limit - 1, 1e100, -1e100)) {
+    expect_no_warning(expect_error(
+      weasel:::.weasel_check_bound(value, "bound"),
+      "bound.*between -2147483647 and 2147483647", class = "weasel_error"
+    ))
+  }
+})
+
+test_that("scalar integer validators preserve their existing input rules", {
+  limit <- .Machine$integer.max
+  values <- list(0, 2L, as.double(limit), 2 + 5e-9, 1e-8)
+  expected <- c(0L, 2L, limit, 2L, 0L)
+  for (check in list(weasel:::.weasel_check_count, weasel:::.weasel_check_bound)) {
+    expect_null(check(NULL, "arg"))
+    for (i in seq_along(values)) {
+      expect_no_warning(expect_identical(check(values[[i]], "arg"), expected[[i]]))
+    }
+    for (value in list(numeric(), c(1, 2), "1", factor("1"), TRUE,
+                       NA_real_, NaN, Inf, -Inf, 1.5, 1.1e-8)) {
+      expect_no_warning(expect_error(check(value, "arg"), "arg.*single",
+                                     class = "weasel_error"))
+    }
+  }
+  values <- c(-limit, -2 - 5e-9, -1e-8)
+  expected <- c(-limit, -2L, 0L)
+  for (i in seq_along(values)) {
+    expect_no_warning(expect_identical(
+      weasel:::.weasel_check_bound(values[[i]], "bound"), expected[[i]]
+    ))
+    expect_no_warning(expect_error(
+      weasel:::.weasel_check_count(values[[i]], "count"), "count.*non-negative",
+      class = "weasel_error"
+    ))
+  }
+})
+
 test_that("weasel errors and warnings are classed conditions", {
   err <- tryCatch(weasel:::.weasel_check_wave(letters[1:3]),
                   error = function(e) e)
