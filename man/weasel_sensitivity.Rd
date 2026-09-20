@@ -46,6 +46,12 @@ for large panels and works when the plan was created with
 \code{keep_data = FALSE}. Use it to show how sensitive the sample size is
 to the chosen tolerances before committing to a scenario.
 }
+\details{
+Tolerance vectors must be nonempty and numeric, with finite, non-negative
+values within \code{1e-8} of integers from 0 to 2147483647. Accepted values are
+rounded, sorted and deduplicated. \code{Inf} is rejected here; scenario tables
+supplied to \code{\link[=weasel_plan]{weasel_plan()}} separately support unlimited tolerances.
+}
 \examples{
 d <- generate_weasel_dummy_data(n_ids = 150, n_times = 10, seed = 1)
 p <- weasel_plan(d, "id", "time", span = "core")

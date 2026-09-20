@@ -21,6 +21,12 @@
 #'   warning `weasel_deprecated`); ignored when `max_gap_len` is
 #'   supplied explicitly.
 #'
+#' @details
+#' Tolerance vectors must be nonempty and numeric, with finite, non-negative
+#' values within `1e-8` of integers from 0 to 2147483647. Accepted values are
+#' rounded, sorted and deduplicated. `Inf` is rejected here; scenario tables
+#' supplied to [weasel_plan()] separately support unlimited tolerances.
+#'
 #' @return A data frame with one row per combination and the columns
 #'   `require_endpoints`, `max_missing`, `n_gap_max`, `max_gap_len`,
 #'   `n_ids`, `prop_ids` (share of all respondents observed in the
@@ -67,7 +73,12 @@ weasel_sensitivity <- function(plan_obj,
       .weasel_stop(name, " must be non-negative integers ",
                    "(fractional values are rejected, not truncated).")
     }
-    sort(unique(as.integer(round(x))))
+    rounded <- round(x)
+    if (any(rounded > .Machine$integer.max)) {
+      .weasel_stop(name, " must contain values between 0 and ",
+                   .Machine$integer.max, ".")
+    }
+    sort(unique(as.integer(rounded)))
   }
   max_missing <- check_tol(max_missing, "max_missing")
   n_gap_max   <- check_tol(n_gap_max, "n_gap_max")
