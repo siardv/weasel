@@ -1,5 +1,10 @@
 # weasel (development version)
 
+* `weasel_sensitivity()` now rejects tolerance values above 2147483647 with a
+  parameter-naming `weasel_error` before integer conversion. This prevents
+  coercion warnings, generic errors and incomplete sweeps from mixed vectors.
+  Valid tolerances, deprecated-alias precedence and separate scenario-table
+  support for `Inf` and large finite values are preserved.
 * Dummy-data generation now handles valid ID ranges ending at 2147483647
   without intermediate integer overflow. Ranges extending beyond the supported
   integer limit fail with a clear `weasel_error` before generation. Ordinary
