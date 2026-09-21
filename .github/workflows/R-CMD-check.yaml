@@ -38,7 +38,7 @@ jobs:
         with:
           r-version: ${{ matrix.config.r }}
           http-user-agent: ${{ matrix.config.http-user-agent }}
-          use-public-rspm: true
+          use-public-rspm: always
 
       - name: Check repository and package inclusion policy
         run: Rscript tools/check_inclusion_policy.R
