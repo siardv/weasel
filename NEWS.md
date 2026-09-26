@@ -1,5 +1,9 @@
 # weasel (development version)
 
+* The deprecated `size` argument of `set_weasel_scope()` now takes its minimum
+  before integer conversion. Larger nonminimum values no longer cause coercion
+  warnings or reject a valid minimum. An unrepresentable minimum fails with a
+  clear `weasel_error`; explicit `min_present` precedence is preserved.
 * `weasel_sensitivity()` now rejects tolerance values above 2147483647 with a
   parameter-naming `weasel_error` before integer conversion. This prevents
   coercion warnings, generic errors and incomplete sweeps from mixed vectors.

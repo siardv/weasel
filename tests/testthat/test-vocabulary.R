@@ -40,6 +40,114 @@ test_that("deprecated scope aliases warn and reproduce the new names", {
   expect_equal(weasel:::the$scope$min_present, 5L)
 })
 
+test_that("size uses a representable minimum without converting larger values", {
+  d <- make_fixture()
+  on.exit(weasel_clear_scope(), add = TRUE)
+  limit <- .Machine$integer.max
+  for (value in list(limit, as.double(limit), c(limit + 1, limit))) {
+    expect_no_warning(expect_warning(
+      env <- set_weasel_scope(d, "id", "time", size = value),
+      class = "weasel_deprecated"
+    ))
+    expect_identical(env$min_present, limit)
+  }
+
+  set_weasel_scope(d, "id", "time", min_present = 3)
+  expected <- suppressMessages(weasel_reshape_to_wide())
+  before <- serialize(d, NULL)
+  for (value in list(c(8, 3, 3), c(3, limit + 1),
+                     c(.Machine$double.xmax, 3),
+                     c(3 + 1e-9, limit + 1, 3 - 1e-9))) {
+    expect_no_warning(expect_warning(
+      env <- set_weasel_scope(d, "id", "time", size = value),
+      class = "weasel_deprecated"
+    ))
+    expect_identical(env$min_present, 3L)
+    expect_identical(suppressMessages(weasel_reshape_to_wide()), expected)
+  }
+  expect_identical(serialize(d, NULL), before)
+})
+
+test_that("size rejects an unrepresentable minimum without changing scope", {
+  d <- make_fixture()
+  env <- set_weasel_scope(d, "id", "time", min_present = 3)
+  on.exit(weasel_clear_scope(), add = TRUE)
+  suppressMessages(weasel_reshape_to_wide())
+  before <- serialize(as.list(env), NULL)
+  for (value in list(2147483648, c(2147483649, 2147483648),
+                     .Machine$double.xmax)) {
+    expect_no_warning(expect_warning(expect_error(
+      set_weasel_scope(d, "id", "time", size = value),
+      "min_present.*between 0 and 2147483647", class = "weasel_error"
+    ), class = "weasel_deprecated"))
+    expect_identical(weasel:::the$scope, env)
+    expect_identical(serialize(as.list(env), NULL), before)
+  }
+})
+
+test_that("size still validates every element before taking its minimum", {
+  d <- make_fixture()
+  on.exit(weasel_clear_scope(), add = TRUE)
+  for (value in list(numeric(), TRUE, "3", factor("3"), list(3), 3 + 0i,
+                     c(3, NA), c(3, NaN), c(3, Inf), c(3, -Inf),
+                     c(3, 0), c(3, -1), c(3, 1 - 1e-9),
+                     c(3, 4.5), c(2147483648, 3.5))) {
+    expect_no_warning(expect_warning(expect_error(
+      set_weasel_scope(d, "id", "time", size = value),
+      "size must be a vector of positive integers", class = "weasel_error"
+    ), class = "weasel_deprecated"))
+  }
+  expect_no_warning(env <- set_weasel_scope(d, "id", "time", size = NULL))
+  expect_identical(env$min_present, 1L)
+})
+
+test_that("explicit min_present still takes precedence over size", {
+  d <- make_fixture()
+  on.exit(weasel_clear_scope(), add = TRUE)
+  for (value in list(2147483648, c(NA, 2147483648), "invalid")) {
+    expect_no_warning(expect_warning(
+      env <- set_weasel_scope(d, "id", "time", min_present = 3, size = value),
+      class = "weasel_deprecated"
+    ))
+    expect_identical(env$min_present, 3L)
+    expect_no_warning(expect_warning(expect_error(
+      set_weasel_scope(d, "id", "time", min_present = NULL, size = value),
+      "min_present must be a single integer >= 1", class = "weasel_error"
+    ), class = "weasel_deprecated"))
+    expect_identical(weasel:::the$scope, env)
+  }
+})
+
+test_that("size minimum validation retains argument and deprecation order", {
+  d <- make_fixture()
+  on.exit(weasel_clear_scope(), add = TRUE)
+  expect_no_warning(expect_error(
+    set_weasel_scope(d, "id", "time", lower = Inf, size = 2147483648),
+    "lower", class = "weasel_error"
+  ))
+  expect_no_warning(expect_warning(expect_error(
+    set_weasel_scope(d, "id", "time", size = c(2147483648, 3.5), gap = 1),
+    "size must be a vector of positive integers", class = "weasel_error"
+  ), class = "weasel_deprecated"))
+
+  warnings <- list()
+  expect_error(withCallingHandlers(
+    set_weasel_scope(d, "id", "time", size = 2147483648,
+                     gap = -1, n_gap = -1, max_missing = -1),
+    warning = function(w) {
+      warnings[[length(warnings) + 1L]] <<- w
+      invokeRestart("muffleWarning")
+    }
+  ), "min_present.*between 0 and 2147483647", class = "weasel_error")
+  expect_length(warnings, 3L)
+  expect_true(all(vapply(warnings, inherits, logical(1), "weasel_deprecated")))
+  expect_identical(vapply(warnings, conditionMessage, character(1)), c(
+    "argument 'size' is deprecated; use 'min_present' instead.",
+    "argument 'gap' is deprecated; use 'max_gap_len' instead.",
+    "argument 'n_gap' is deprecated; use 'n_gap_max' instead."
+  ))
+})
+
 test_that("min_present defaults to 1: exploration shows everyone", {
   d <- rbind(make_fixture(),
              data.frame(id = "solo", time = 5, var1 = 0))

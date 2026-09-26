@@ -44,7 +44,10 @@
 #'   `weasel_deprecated`): use `min_present` (for `size`, whose minimum
 #'   is used), `max_gap_len` (for `gap`), and `n_gap_max` (for
 #'   `n_gap`). An explicitly supplied new-name argument takes
-#'   precedence over its alias.
+#'   precedence over its alias. When used, `size` must be a nonempty
+#'   numeric vector of finite values at least 1 and within `1e-8` of
+#'   integers. Its rounded minimum must be at most 2147483647; larger
+#'   nonminimum values are allowed.
 #' @param grid How the wave grid inside the span is defined.
 #'   `"consecutive"` (default) treats every integer between `lower` and
 #'   `upper` as a scheduled wave; `"observed"` uses only wave values
@@ -109,7 +112,7 @@ set_weasel_scope <- function(data,
         .weasel_stop("size must be a vector of positive integers ",
                      "(fractional values are rejected, not truncated).")
       }
-      min_present <- min(as.integer(round(size)))
+      min_present <- min(round(size))
     }
   }
   if (!is.null(gap)) {
