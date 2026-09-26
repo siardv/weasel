@@ -78,7 +78,10 @@ and a scope already exists, an error is raised.}
 \code{weasel_deprecated}): use \code{min_present} (for \code{size}, whose minimum
 is used), \code{max_gap_len} (for \code{gap}), and \code{n_gap_max} (for
 \code{n_gap}). An explicitly supplied new-name argument takes
-precedence over its alias.}
+precedence over its alias. When used, \code{size} must be a nonempty
+numeric vector of finite values at least 1 and within \code{1e-8} of
+integers. Its rounded minimum must be at most 2147483647; larger
+nonminimum values are allowed.}
 }
 \value{
 The scope environment, invisibly.
