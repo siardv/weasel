@@ -237,6 +237,108 @@ test_that("dummy data is invariant to the caller's RNG kind", {
   expect_identical(RNGkind(), legacy_kind)
 })
 
+test_that("dummy schedules preserve signed boundaries and normalized labels", {
+  limit <- .Machine$integer.max
+  schedules <- list(c(-limit, 0L, limit), c(limit - 2L, limit - 1L, limit),
+                    c(-limit, -limit + 1L, -limit + 2L),
+                    c(2 + 5e-9, -2 - 5e-9, 1e-8, 2L, -1e-8))
+  labels <- list(c(-limit, 0L, limit), c(limit - 2L, limit - 1L, limit),
+                c(-limit, -limit + 1L, -limit + 2L), c(-2L, 0L, 2L))
+  for (i in seq_along(schedules)) {
+    reference <- generate_weasel_dummy_data(
+      n_ids = 3, n_times = 3, n_vars = 2, seed = 7
+    )
+    reference$time <- labels[[i]][reference$time]
+    before <- serialize(schedules[[i]], NULL)
+    expect_no_warning(actual <- generate_weasel_dummy_data(
+      n_ids = 3, waves = schedules[[i]], n_vars = 2, seed = 7
+    ))
+    expect_identical(actual, reference)
+    expect_type(actual$time, "integer")
+    expect_identical(serialize(schedules[[i]], NULL), before)
+  }
+})
+
+test_that("invalid schedule ranges fail before RNG entry without dropping labels", {
+  old <- options(weasel.verbose = TRUE)
+  old_kind <- RNGkind()
+  had_seed <- exists(".Random.seed", envir = globalenv(), inherits = FALSE)
+  old_seed <- if (had_seed) get(".Random.seed", envir = globalenv())
+  on.exit({
+    options(old)
+    suppressWarnings(do.call(RNGkind, as.list(old_kind)))
+    if (had_seed) {
+      assign(".Random.seed", old_seed, envir = globalenv())
+    } else if (exists(".Random.seed", envir = globalenv(), inherits = FALSE)) {
+      rm(".Random.seed", envir = globalenv())
+    }
+  }, add = TRUE)
+  RNGkind("Wichmann-Hill", "Box-Muller", sample.kind = "Rejection")
+  set.seed(61)
+  before_seed <- .Random.seed
+  before_kind <- RNGkind()
+  limit <- .Machine$integer.max
+  for (has_seed in c(TRUE, FALSE)) {
+    if (!has_seed) rm(".Random.seed", envir = globalenv())
+    for (value in c(limit + 1, -limit - 1,
+                    .Machine$double.xmax, -.Machine$double.xmax)) {
+      for (waves in list(value, c(1:3, value), c(value, 1, 2))) {
+        expect_no_message(expect_no_warning(expect_error(
+          generate_weasel_dummy_data(n_ids = 2, n_vars = 1, waves = waves),
+          "waves.*between -2147483647 and 2147483647", class = "weasel_error"
+        )))
+        expect_identical(
+          exists(".Random.seed", envir = globalenv(), inherits = FALSE), has_seed
+        )
+        if (has_seed) expect_identical(.Random.seed, before_seed)
+        expect_identical(RNGkind(), before_kind)
+      }
+    }
+  }
+})
+
+test_that("dummy schedule validation keeps existing rules and argument order", {
+  overflow <- .Machine$integer.max + 1
+  for (waves in list(numeric(), "1", factor(1:3), TRUE, list(1:3), 1 + 0i,
+                     c(1:3, NA), c(1:3, NaN), c(1:3, Inf), c(1:3, -Inf),
+                     c(1:3, 1.1e-8), c(overflow, NA), c(overflow, Inf),
+                     c(overflow, 1.5))) {
+    expect_no_warning(expect_error(
+      generate_weasel_dummy_data(n_ids = 2, n_vars = 1, waves = waves),
+      "waves must be integer-valued wave labels", class = "weasel_error"
+    ))
+  }
+  for (waves in list(1:2, c(1, 1 + 5e-9, 2))) {
+    expect_no_warning(expect_error(
+      generate_weasel_dummy_data(n_ids = 2, waves = waves),
+      "waves must contain more than 2 distinct", class = "weasel_error"
+    ))
+  }
+  for (arg in c("n_times", "prop_random", "attention_scale", "seed")) {
+    args <- list(n_ids = 2, n_vars = 1, waves = c(1:3, overflow))
+    args[[arg]] <- if (arg %in% c("n_times", "seed")) overflow else -1
+    expect_no_warning(expect_error(
+      do.call(generate_weasel_dummy_data, args), arg, class = "weasel_error"
+    ))
+  }
+  expect_no_warning(expect_error(
+    generate_weasel_dummy_data(n_ids = NULL, waves = c(1:3, overflow)),
+    "must not be NULL", class = "weasel_error"
+  ))
+  expect_no_warning(expect_error(
+    generate_weasel_dummy_data(n_ids = 0, waves = overflow,
+                               block_duration_range = c(0, 0)),
+    "waves.*between", class = "weasel_error"
+  ))
+  reference <- generate_weasel_dummy_data(n_ids = 2, n_times = 3, seed = 7)
+  for (n_times in 0:2) {
+    expect_no_warning(actual <- generate_weasel_dummy_data(
+      n_ids = 2, n_times = n_times, waves = 1:3, seed = 7
+    ))
+    expect_identical(actual, reference)
+  }
+})
+
 test_that("dummy data supports explicit wave schedules", {
   sched <- seq(2008L, 2020L, by = 2L)
   b <- generate_weasel_dummy_data(n_ids = 25, waves = sched, seed = 3)
