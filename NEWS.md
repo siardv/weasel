@@ -1,5 +1,10 @@
 # weasel (development version)
 
+* Equal `block_duration_range` endpoints in `generate_weasel_dummy_data()` now
+  produce the requested fixed duration, clipped at the final scheduled wave.
+  Previously a shorter duration could be sampled. Long durations also clip
+  without integer overflow. Seeded output for ordinary ranges containing
+  multiple durations is unchanged.
 * Explicit `waves` in `generate_weasel_dummy_data()` now reject labels outside
   -2147483647 to 2147483647 with a clear `weasel_error` before integer conversion
   and random draws. This prevents coercion warnings and silently shortened

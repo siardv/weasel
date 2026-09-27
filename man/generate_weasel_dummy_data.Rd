@@ -53,7 +53,9 @@ out from a random wave onwards.}
 block of waves.}
 
 \item{block_duration_range}{Integer vector of length 2 giving the
-min/max duration of block missingness.}
+min/max duration of block missingness. Equal endpoints request a
+fixed duration. Blocks extending beyond the final scheduled wave
+are clipped at that wave.}
 
 \item{prop_item_missing}{Probability that an individual outcome value
 on an observed row is \code{NA} (item nonresponse).}
