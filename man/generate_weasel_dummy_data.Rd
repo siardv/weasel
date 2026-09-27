@@ -64,7 +64,10 @@ between -2147483647 and 2147483647. The final identifier,
 are rejected before random draws.}
 
 \item{waves}{Optional integer vector of wave labels, for example
-\code{seq(2008, 2032, by = 2)} for a biennial schedule. When supplied it
+\code{seq(2008, 2032, by = 2)} for a biennial schedule. Values must be
+finite and between -2147483647 and 2147483647. Deviations of up to
+\code{1e-8} from an integer are accepted and rounded; the sorted, unique
+schedule must contain more than 2 labels. When supplied it
 overrides \code{n_times}; the participation mechanisms operate on the
 positions of this schedule, and the returned \code{time} column contains
 these labels. Analyse such data with \code{grid = "observed"} in

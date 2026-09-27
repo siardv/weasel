@@ -48,7 +48,10 @@
 #'   `id_start + n_ids - 1`, must not exceed 2147483647. Invalid ID ranges
 #'   are rejected before random draws.
 #' @param waves Optional integer vector of wave labels, for example
-#'   `seq(2008, 2032, by = 2)` for a biennial schedule. When supplied it
+#'   `seq(2008, 2032, by = 2)` for a biennial schedule. Values must be
+#'   finite and between -2147483647 and 2147483647. Deviations of up to
+#'   `1e-8` from an integer are accepted and rounded; the sorted, unique
+#'   schedule must contain more than 2 labels. When supplied it
 #'   overrides `n_times`; the participation mechanisms operate on the
 #'   positions of this schedule, and the returned `time` column contains
 #'   these labels. Analyse such data with `grid = "observed"` in
@@ -133,7 +136,13 @@ generate_weasel_dummy_data <- function(n_ids = 1000,
       .weasel_stop("waves must be integer-valued wave labels ",
                    "(fractional values are rejected, not truncated).")
     }
-    waves <- sort(unique(as.integer(round(waves))))
+    rounded_waves <- round(waves)
+    if (any(rounded_waves < -.Machine$integer.max |
+            rounded_waves > .Machine$integer.max)) {
+      .weasel_stop("waves must contain values between ", -.Machine$integer.max,
+                   " and ", .Machine$integer.max, ".")
+    }
+    waves <- sort(unique(as.integer(rounded_waves)))
     if (length(waves) <= 2) {
       .weasel_stop("waves must contain more than 2 distinct integer values.")
     }

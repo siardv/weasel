@@ -1,5 +1,10 @@
 # weasel (development version)
 
+* Explicit `waves` in `generate_weasel_dummy_data()` now reject labels outside
+  -2147483647 to 2147483647 with a clear `weasel_error` before integer conversion
+  and random draws. This prevents coercion warnings and silently shortened
+  schedules. Valid schedule normalization, seeded output and caller RNG state
+  are preserved.
 * The deprecated `size` argument of `set_weasel_scope()` now takes its minimum
   before integer conversion. Larger nonminimum values no longer cause coercion
   warnings or reject a valid minimum. An unrepresentable minimum fails with a
