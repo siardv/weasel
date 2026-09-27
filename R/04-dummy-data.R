@@ -40,7 +40,9 @@
 #' @param prop_block Proportion of respondents who miss one contiguous
 #'   block of waves.
 #' @param block_duration_range Integer vector of length 2 giving the
-#'   min/max duration of block missingness.
+#'   min/max duration of block missingness. Equal endpoints request a
+#'   fixed duration. Blocks extending beyond the final scheduled wave
+#'   are clipped at that wave.
 #' @param prop_item_missing Probability that an individual outcome value
 #'   on an observed row is `NA` (item nonresponse).
 #' @param id_start Starting integer for respondent identifiers; must be
@@ -209,9 +211,10 @@ generate_weasel_dummy_data <- function(n_ids = 1000,
       blk_rows <- sample.int(n_ids, n_block)
       for (k in seq_len(n_block)) {
         blk_start <- sample.int(max(n_times - 2L, 1L), 1) + 1L
-        dur <- sample(seq.int(block_duration_range[1],
-                              block_duration_range[2]), 1)
-        blk_end <- min(n_times, blk_start + dur - 1L)
+        durations <- seq.int(block_duration_range[1], block_duration_range[2])
+        # sample positions so a single duration remains fixed
+        dur <- durations[sample.int(length(durations), 1)]
+        blk_end <- min(n_times, as.double(blk_start) + dur - 1)
         present[blk_rows[k], blk_start:blk_end] <- FALSE
       }
     }

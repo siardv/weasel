@@ -356,6 +356,99 @@ test_that("dummy data supports explicit wave schedules", {
   expect_error(generate_weasel_dummy_data(waves = c(1, 2)), "more than 2")
 })
 
+test_that("fixed block durations create the requested contiguous missingness", {
+  for (duration in 1:3) {
+    expect_no_warning(d <- generate_weasel_dummy_data(
+      n_ids = 6, n_times = 8, n_vars = 1, seed = 7,
+      prop_random = 0, prop_attention = 0, prop_attrition = 0,
+      prop_block = 1, block_duration_range = rep(duration, 2),
+      prop_item_missing = 0
+    ))
+    expect_identical(length(unique(d$id)), 6L)
+    for (times in split(d$time, d$id)) {
+      missing <- setdiff(1:8, times)
+      expect_gte(min(missing), 2L)
+      expect_identical(missing, seq.int(min(missing), max(missing)))
+      expect_equal(length(missing), min(duration, 9L - min(missing)))
+    }
+  }
+})
+
+test_that("long block durations clip safely at the final wave", {
+  limit <- .Machine$integer.max
+  for (range in list(c(8, 8), c(limit, limit), c(limit - 1L, limit),
+                     rep(limit + 1, 2), rep(.Machine$double.xmax, 2))) {
+    expect_no_warning(d <- generate_weasel_dummy_data(
+      n_ids = 3, n_times = 8, n_vars = 1, seed = 7,
+      prop_random = 0, prop_attention = 0, prop_attrition = 0,
+      prop_block = 1, block_duration_range = range, prop_item_missing = 0
+    ))
+    expect_identical(length(unique(d$id)), 3L)
+    for (times in split(d$time, d$id)) {
+      expect_identical(times, seq_len(max(times)))
+      expect_lt(max(times), 8L)
+    }
+  }
+})
+
+test_that("block sampling retains ordinary seeded ranges and schedule mapping", {
+  ranges <- list(c(2L, 4L), c(4L, 2L))
+  expected_missing <- list(c(2L, 4L, 2L, 2L, 4L, 2L),
+                           c(4L, 2L, 4L, 4L, 2L, 4L))
+  for (i in seq_along(ranges)) {
+    d <- generate_weasel_dummy_data(
+      n_ids = 6, n_times = 8, n_vars = 1, seed = 7,
+      prop_random = 0, prop_attention = 0, prop_attrition = 0,
+      prop_block = 1, block_duration_range = ranges[[i]], prop_item_missing = 0
+    )
+    expect_identical(8L - as.integer(table(d$id)), expected_missing[[i]])
+  }
+  args <- list(n_ids = 6, n_times = 8, n_vars = 2, seed = 7,
+               prop_block = 1, block_duration_range = c(3, 3))
+  reference <- do.call(generate_weasel_dummy_data, args)
+  schedule <- seq.int(2000L, 2014L, by = 2L)
+  reference$time <- schedule[reference$time]
+  args$waves <- schedule
+  expect_identical(do.call(generate_weasel_dummy_data, args), reference)
+})
+
+test_that("fixed block sampling is reproducible and retains caller RNG state", {
+  old_kind <- RNGkind()
+  had_seed <- exists(".Random.seed", envir = globalenv(), inherits = FALSE)
+  old_seed <- if (had_seed) get(".Random.seed", envir = globalenv())
+  on.exit({
+    suppressWarnings(do.call(RNGkind, as.list(old_kind)))
+    if (had_seed) {
+      assign(".Random.seed", old_seed, envir = globalenv())
+    } else if (exists(".Random.seed", envir = globalenv(), inherits = FALSE)) {
+      rm(".Random.seed", envir = globalenv())
+    }
+  }, add = TRUE)
+  args <- list(n_ids = 6, n_times = 8, n_vars = 2, seed = 7,
+               prop_block = 1, block_duration_range = c(3, 3))
+  reference <- do.call(generate_weasel_dummy_data, args)
+  RNGkind("Wichmann-Hill", "Box-Muller", sample.kind = "Rejection")
+  set.seed(61)
+  before_seed <- .Random.seed
+  before_kind <- RNGkind()
+  expect_identical(do.call(generate_weasel_dummy_data, args), reference)
+  expect_identical(.Random.seed, before_seed)
+  expect_identical(RNGkind(), before_kind)
+  args$seed <- NULL
+  first <- suppressMessages(do.call(generate_weasel_dummy_data, args))
+  expect_identical(suppressMessages(do.call(generate_weasel_dummy_data, args)), first)
+  expect_identical(.Random.seed, before_seed)
+  expect_identical(RNGkind(), before_kind)
+
+  RNGkind("Mersenne-Twister", "Inversion", sample.kind = "Rejection")
+  before_kind <- RNGkind()
+  rm(".Random.seed", envir = globalenv())
+  args$seed <- 7
+  expect_identical(do.call(generate_weasel_dummy_data, args), reference)
+  expect_false(exists(".Random.seed", envir = globalenv(), inherits = FALSE))
+  expect_identical(RNGkind(), before_kind)
+})
+
 test_that("dummy data validates its arguments", {
   expect_error(generate_weasel_dummy_data(n_ids = 0), "n_ids")
   expect_error(generate_weasel_dummy_data(n_times = 2), "n_times")
