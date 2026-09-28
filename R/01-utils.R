@@ -592,15 +592,28 @@ the <- new.env(parent = emptyenv())
 }
 
 # evaluate expr without leaving a net change in the caller's RNG state;
-# saving/restoring .Random.seed in globalenv is the sanctioned mechanism
+# saving/restoring .Random.seed in globalenv is the sanctioned mechanism.
+# without a stored seed the caller's RNGkind() lives only in R's in-memory
+# generator settings, which removing .Random.seed does not reset, so that
+# configuration is captured on entry and put back through RNGkind()
 .weasel_with_preserved_seed <- function(expr) {
   has_seed <- exists(".Random.seed", envir = globalenv(), inherits = FALSE)
   old_seed <- if (has_seed) get(".Random.seed", envir = globalenv(), inherits = FALSE)
+  old_kind <- if (!has_seed) RNGkind()
   on.exit({
     if (has_seed) {
       assign(".Random.seed", old_seed, envir = globalenv())
-    } else if (exists(".Random.seed", envir = globalenv(), inherits = FALSE)) {
-      rm(".Random.seed", envir = globalenv())
+    } else {
+      # selecting a kind writes a .Random.seed of its own, so restore the
+      # configuration first and remove that seed afterwards. every setting
+      # RNGkind() reports is passed back positionally, which also covers
+      # settings added by later R versions (binom.kind in R-devel); base R
+      # warns whenever a legacy setting such as the Rounding sampler is
+      # selected, hence suppressWarnings()
+      suppressWarnings(do.call(RNGkind, as.list(old_kind)))
+      if (exists(".Random.seed", envir = globalenv(), inherits = FALSE)) {
+        rm(".Random.seed", envir = globalenv())
+      }
     }
   }, add = TRUE)
   expr

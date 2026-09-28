@@ -1,5 +1,15 @@
 # weasel (development version)
 
+* `generate_weasel_dummy_data()` now restores the caller's complete `RNGkind()`
+  configuration when no `.Random.seed` existed before the call. Previously a
+  non-default kind (for example `sample.kind = "Rounding"`) was replaced by
+  the generator's pinned Mersenne-Twister/Inversion/Rejection configuration
+  on both successful and failed calls, while the absent seed was correctly
+  left absent. Every setting `RNGkind()` reports is restored, including
+  settings added by later R versions such as R-devel's `binom.kind`. Seeded
+  output, seed reporting and behaviour with an existing `.Random.seed` are
+  unchanged. The help page now also records R's own limitation that a
+  pending Box-Muller normal deviate is not carried by `.Random.seed`.
 * Equal `block_duration_range` endpoints in `generate_weasel_dummy_data()` now
   produce the requested fixed duration, clipped at the final scheduled wave.
   Previously a shorter duration could be sampled. Long durations also clip

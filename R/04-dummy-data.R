@@ -16,7 +16,13 @@
 #' configuration to `RNGkind("Mersenne-Twister", "Inversion",
 #' sample.kind = "Rejection")`, the R >= 3.6 defaults, so a given seed
 #' reproduces the same panel even when the caller uses a non-default
-#' sampler (for example `sample.kind = "Rounding"`).
+#' sampler (for example `sample.kind = "Rounding"`). One limitation comes
+#' from R itself: `.Random.seed` does not store the cached second deviate
+#' of the `"Box-Muller"` normal generator (see `?RNGkind`), so a caller's
+#' pending cached deviate is not restored. Subsequent draws that use the
+#' normal generator, including `rnorm()` and `rlnorm()`, and draws
+#' interleaved with them may therefore differ from an uninterrupted
+#' stream; only draws made before the first such call are unaffected.
 #'
 #' @param n_ids Number of respondents; an integer from 1 to 2147483647.
 #' @param n_times Number of time points (waves); an integer from 0 to
