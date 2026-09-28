@@ -105,7 +105,13 @@ caller's RNG state: the state present before the call (including the
 controlled through \code{seed}. Internally the generator pins the RNG
 configuration to \code{RNGkind("Mersenne-Twister", "Inversion", sample.kind = "Rejection")}, the R >= 3.6 defaults, so a given seed
 reproduces the same panel even when the caller uses a non-default
-sampler (for example \code{sample.kind = "Rounding"}).
+sampler (for example \code{sample.kind = "Rounding"}). One limitation comes
+from R itself: \code{.Random.seed} does not store the cached second deviate
+of the \code{"Box-Muller"} normal generator (see \code{?RNGkind}), so a caller's
+pending cached deviate is not restored. Subsequent draws that use the
+normal generator, including \code{rnorm()} and \code{rlnorm()}, and draws
+interleaved with them may therefore differ from an uninterrupted
+stream; only draws made before the first such call are unaffected.
 }
 \examples{
 d <- generate_weasel_dummy_data(n_ids = 50, n_times = 8, seed = 1)
