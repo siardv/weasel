@@ -83,7 +83,9 @@ score = 2.0 * mean_prop_present      (coverage)
 ```
 
 Scenarios that retain no respondents receive `NA` and are never
-recommended; ties go to the larger sample. You can reweight any term:
+recommended; exact ties go to the larger sample, then to input-table
+order, and `tie_tolerance` flags near-ties without changing the
+recommendation. You can reweight any term:
 
 ```{r}
 size_first <- weasel_compare_scenarios(
@@ -250,7 +252,10 @@ decomposition travel with the comparison table, `near_tie` flags
 scenarios the score cannot meaningfully separate (tune with
 `tie_tolerance`), and because the size term is normalised within the
 supplied scenario set, scores are comparison-relative rather than
-absolute properties of a scenario:
+absolute properties of a scenario. Existing scores move only when the
+largest retained sample in the set changes, which can reverse a ranking
+between two otherwise unchanged scenarios; a zero `size` weight removes
+the effect:
 
 ```{r}
 cmp_audit <- weasel_compare_scenarios(plan_custom)

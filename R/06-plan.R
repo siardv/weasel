@@ -160,8 +160,10 @@ weasel_match_scenario <- function(scenario, choices) {
 #' per-respondent count of missing waves among retained respondents,
 #' normalised by span length), and `gaps` is
 #' `(mean_n_gap + mean_max_gap) / L`. Scenarios retaining no
-#' respondents receive `NA` and are never recommended. Ties are broken
-#' in favour of the larger sample.
+#' respondents receive `NA` and are never recommended. Exact score ties
+#' are broken in favour of the larger sample, then by input-table
+#' order; `tie_tolerance` only flags near-ties in `near_tie` and never
+#' changes which scenario is recommended.
 #'
 #' The score is a configurable heuristic, not a validated decision
 #' rule: the weights encode one reasonable trade-off, and the
@@ -169,7 +171,16 @@ weasel_match_scenario <- function(scenario, choices) {
 #' weights, nothing more. Because the `size` term is normalised by the
 #' largest `n_ids` in the supplied set, a scenario's score depends on
 #' which scenarios it is compared with; scores are comparison-relative,
-#' not absolute properties of a scenario. Scenarios whose scores fall
+#' not absolute properties of a scenario. With subsets and weights held
+#' fixed, a change to the comparison set affects existing scores only
+#' through the `size` contribution, so existing scores change only when
+#' the largest `n_ids` in the set changes, and such a change can reverse
+#' the ranking, and hence the recommendation, between two scenarios
+#' whose own subsets are unchanged. When the largest `n_ids` is
+#' unchanged, existing scores are unchanged, although an added scenario
+#' can itself become the recommended one. A zero `size` weight removes
+#' this dependence; scenarios retaining no respondents keep `NA` in
+#' every comparison. Scenarios whose scores fall
 #' within `tie_tolerance` of the best are flagged in `near_tie`,
 #' signalling that the heuristic does not meaningfully distinguish
 #' them; endpoint-requiring scenarios earn the `endpoints` term by
