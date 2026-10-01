@@ -3,7 +3,16 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>weasel: Workflow Guide</title>
+  <title>weasel: Wave and Respondent Selection for Longitudinal Panel Data</title>
+  <meta name="description" content="R tools for exploring wave participation, comparing respondent-selection scenarios, extracting longitudinal analysis samples, and auditing missing-wave and attrition-related selection decisions.">
+  <link rel="canonical" href="https://siardv.github.io/weasel/">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="weasel: Wave and Respondent Selection for Longitudinal Panel Data">
+  <meta property="og:description" content="R tools for exploring wave participation, comparing respondent-selection scenarios, extracting longitudinal analysis samples, and auditing missing-wave and attrition-related selection decisions.">
+  <meta property="og:url" content="https://siardv.github.io/weasel/">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="weasel: Wave and Respondent Selection for Longitudinal Panel Data">
+  <meta name="twitter:description" content="R tools for exploring wave participation, comparing respondent-selection scenarios, extracting longitudinal analysis samples, and auditing missing-wave and attrition-related selection decisions.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
@@ -32,6 +41,14 @@
     <div class="container">
       <div class="intro-inner">
         <h1 class="intro-headline">weasel turns wave-and-respondent selection in longitudinal panels into an explicit, reproducible workflow.</h1>
+        <p class="intro-lede">
+          <code>weasel</code> is an R package for researchers working with longitudinal panel or
+          repeated-measures data who need to decide which waves and respondents belong
+          in an analysis sample. It maps participation patterns, compares explicit
+          selection scenarios using missing-wave tolerances, endpoint requirements,
+          and interior-gap constraints, and audits the resulting sample with
+          sensitivity and selectivity diagnostics.
+        </p>
         <p class="intro-lede">
           Which workflow do you need? Answer one question at a time to reach the right recipe.
           The address bar follows along, so any step or recipe can be shared as a direct link.

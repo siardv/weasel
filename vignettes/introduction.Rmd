@@ -1,8 +1,8 @@
 ---
-title: "Introduction to weasel"
+title: "Introduction to weasel: Wave and Respondent Selection"
 output: rmarkdown::html_vignette
 vignette: >
-  %\VignetteIndexEntry{Introduction to weasel}
+  %\VignetteIndexEntry{Introduction to weasel: Wave and Respondent Selection}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---

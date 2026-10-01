@@ -1,8 +1,8 @@
 ---
-title: "Advanced usage"
+title: "Advanced weasel: Selection Constraints and Diagnostics"
 output: rmarkdown::html_vignette
 vignette: >
-  %\VignetteIndexEntry{Advanced usage}
+  %\VignetteIndexEntry{Advanced weasel: Selection Constraints and Diagnostics}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
