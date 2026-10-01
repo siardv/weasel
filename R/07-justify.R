@@ -302,7 +302,7 @@ weasel_justify_subset <- function(plan_obj,
       "We used the %s framework (%s)%s to derive a reproducible longitudinal analysis subset from the available panel waves.",
       acronym, full_name, cite_txt
     ),
-    "The goal was to avoid ad hoc inclusion rules by explicitly defining admissible participation patterns and selecting a subset that balances longitudinal completeness with sample size.",
+    "Admissible participation patterns were defined explicitly, and the retained subset follows from those definitions and the supplied data.",
     sprintf(
       "We defined a target window of %s%s and applied structural constraints to respondent trajectories.",
       waves_txt, if (!is.null(L_txt)) sprintf(" (%s)", L_txt) else ""
@@ -327,7 +327,7 @@ weasel_justify_subset <- function(plan_obj,
       )
     } else NULL,
     span_txt,
-    "This approach improves transparency because the inclusion set is fully determined by declared constraints (window bounds, endpoint handling, and permitted missingness structure) rather than subjective post hoc decisions."
+    "The inclusion set is fully determined by the declared constraints (window bounds, endpoint handling, and permitted missingness structure) and the supplied data, and can be regenerated from them."
   )
   .collapse_parts(parts)
 }

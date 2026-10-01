@@ -508,7 +508,8 @@ weasel_plan <- function(data,
   idm <- .weasel_id_metrics(data, id, wave, span_vec)
   if (nrow(idm) == 0) .weasel_stop("no usable ids found in the chosen span.")
 
-  if (is.null(scenarios)) {
+  default_table <- is.null(scenarios)
+  if (default_table) {
     scenarios <- data.frame(
       scenario          = c("anchored_strict", "anchored_balanced",
                             "lenient_info_max"),
@@ -563,7 +564,7 @@ weasel_plan <- function(data,
     anchored_balanced = "good balance, anchored endpoints",
     lenient_info_max  = "largest N, endpoints not guaranteed"
   )
-  plan$note <- unname(default_notes[plan$scenario])
+  plan$note <- if (default_table) unname(default_notes[plan$scenario]) else ""
   plan$note[is.na(plan$note)] <- ""
 
   plan <- weasel_compare_scenarios(list(plan = plan))
