@@ -6,6 +6,13 @@
 
 **`weasel` turns wave-and-respondent selection in longitudinal panels into an explicit, reproducible workflow.**
 
+`weasel` is an R package for researchers working with longitudinal panel or
+repeated-measures data who need to decide which waves and respondents belong
+in an analysis sample. It maps participation patterns, compares explicit
+selection scenarios using missing-wave tolerances, endpoint requirements,
+and interior-gap constraints, and audits the resulting sample with
+sensitivity and selectivity diagnostics.
+
 **Workflow guide:** <https://siardv.github.io/weasel/>
 
 Longitudinal analyses rarely use every respondent at every wave, and the
