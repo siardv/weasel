@@ -1,5 +1,13 @@
 # weasel (development version)
 
+* New plans created from custom `scenarios` tables no longer inherit default
+  characterizations through matching scenario names. Explicit copies of the
+  default rules also count as custom input; omitted or `NULL` scenarios retain
+  the default descriptions. Selection, scores and stored notes in existing
+  saved plans are unchanged.
+* The fixed sentences in extended subset justifications now describe explicit
+  participation rules, their dependence on the supplied data and reproducibility,
+  without inferring research motives, decision timing or improved transparency.
 * `generate_weasel_dummy_data()` now restores the caller's complete `RNGkind()`
   configuration when no `.Random.seed` existed before the call. Previously a
   non-default kind (for example `sample.kind = "Rounding"`) was replaced by
