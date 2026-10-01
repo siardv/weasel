@@ -45,17 +45,37 @@ are observed in the span but excluded, covariate by covariate, and
 reports the standardized mean difference (SMD) for each.
 }
 \details{
-For every respondent, a single value per covariate is taken either
-from their first observed wave inside the span (\code{at = "first"}, the
-usual baseline comparison) or as the mean over their observed waves
-in the span (\code{at = "mean"}). Missing item values are dropped within
-each group. Duplicated (id, wave) rows trigger a classed warning
-(\code{weasel_duplicates}) and their covariate values are averaged within
-each pair first, so the diagnostic counts each pair once and does
-not depend on the row order of the input. The SMD divides the group difference by the pooled
-standard deviation \code{sqrt((sd_retained^2 + sd_excluded^2) / 2)};
-absolute values around 0.1 or larger are commonly read as noteworthy
-imbalance. The SMD is \code{NA} when either group has no spread.
+For each respondent, \code{at = "first"} uses the covariate value at their
+first observed wave inside the span. A missing item at that wave
+remains missing; the diagnostic does not search later waves for a
+non-missing value. First observed waves may differ between
+respondents, so this need not compare a common baseline.
+
+With \code{at = "mean"}, the respondent summary averages non-missing
+covariate values over their observed waves in the span. Respondents
+can contribute different sets of waves. If a covariate changes over
+time, differing observation times can contribute to differences
+under either summary.
+
+Duplicated (id, wave) rows trigger a classed warning
+(\code{weasel_duplicates}). Non-missing covariate values are averaged
+within each pair first, so duplicate physical rows do not add wave
+weight. Respondents with missing summaries are omitted separately
+for each covariate; the reported group counts therefore need not
+equal the scenario's total respondent counts.
+
+The SMD divides the retained-minus-excluded mean difference by
+\code{sqrt((sd_retained^2 + sd_excluded^2) / 2)}, using the two group
+sample standard deviations. It is \code{NA} when either group has fewer
+than two non-missing respondent summaries, or when this denominator
+is zero or \code{NA}. One constant group can yield a finite SMD when
+the other group varies.
+
+Absolute SMD values around 0.1 are a descriptive balance heuristic
+whose interpretation depends on context and covariate importance.
+The diagnostic describes observed mean imbalance; small SMDs do not
+establish similar distributions, an attrition mechanism, ignorable
+attrition or unbiased inference.
 }
 \examples{
 d <- generate_weasel_dummy_data(n_ids = 200, n_times = 10, seed = 1)
@@ -63,4 +83,9 @@ p <- weasel_plan(d, "id", "time", span = "core")
 sel <- weasel_selectivity(p, "anchored_balanced")
 weasel_print_table(sel, title = "Retained vs excluded", digits = 3)
 
+}
+\references{
+Austin, P. C. (2009). Balance diagnostics for comparing the distribution
+of baseline covariates between treatment groups in propensity-score
+matched samples. \doi{10.1002/sim.3697}.
 }

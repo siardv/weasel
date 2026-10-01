@@ -165,14 +165,24 @@ using each respondent's value at their first observed wave (or their
 within-span mean with `at = "mean"`), and reports standardized mean
 differences:
 
+First observed waves can differ between respondents, so this need not
+compare a common baseline. A missing item at the first observed wave
+remains missing, even if a later wave has a value. Within-span means
+can also average different sets of waves. For covariates that change
+over time, differing observation times can contribute to the comparison.
+
 ```{r}
 sel <- weasel_selectivity(plan_custom, "one_gap_ok")
 weasel_print_table(sel, title = "Retained vs excluded", digits = 3)
 ```
 
-Absolute SMD values around 0.1 or larger are commonly read as
-noteworthy imbalance; the synthetic data here has no such mechanism,
-so the differences stay small.
+Absolute SMD values around 0.1 are a descriptive balance heuristic,
+rather than a universal cutoff (see
+[Austin, 2009](https://doi.org/10.1002/sim.3697)). Participation in this
+example is generated without using the covariates, but finite-sample
+differences can still exceed that value, as `var2` and `var1` do here.
+These comparisons describe observed covariate means; small SMDs do not
+establish similar distributions, ignorable attrition or unbiased estimates.
 
 ## Plans without attached data
 
