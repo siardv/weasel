@@ -1,5 +1,12 @@
 # weasel (development version)
 
+* `weasel_selectivity()` now preserves a common finite covariate value when
+  all non-missing values in a duplicated respondent-wave pair are identical.
+  Rounding while averaging copies could previously create artificial spread
+  and a huge finite SMD when both comparison groups were constant. Constant
+  pairs also retain their finite value when their sum would overflow; later
+  mean, standard-deviation and SMD calculations still have their existing
+  floating-point limits, so extreme-value SMDs can remain incorrect.
 * New plans created from custom `scenarios` tables no longer inherit default
   characterizations through matching scenario names. Explicit copies of the
   default rules also count as custom input; omitted or `NULL` scenarios retain
