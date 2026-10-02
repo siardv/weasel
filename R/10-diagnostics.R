@@ -115,6 +115,30 @@ weasel_sensitivity <- function(plan_obj,
   g
 }
 
+# pair groups are dense and increasing in normalized id/wave order
+.weasel_pair_mean <- function(x, grp) {
+  x       <- as.numeric(x)
+  missing <- is.na(x)
+  sums    <- rowsum(ifelse(missing, 0, x), grp)
+  cnts    <- rowsum(as.numeric(!missing), grp)
+  m       <- as.numeric(sums / cnts)
+  m[cnts == 0] <- NA_real_
+
+  # identical finite copies retain their value, even if their sum overflows
+  observed <- !missing
+  if (any(observed)) {
+    values <- x[observed]
+    groups <- grp[observed]
+    common <- values[match(seq_along(m), groups)]
+    different <- !is.finite(values) | values != common[groups]
+    constant <- is.finite(common) &
+      tabulate(groups[different], nbins = length(m)) == 0L
+    common[!is.na(common) & common == 0] <- 0
+    m[constant] <- common[constant]
+  }
+  m
+}
+
 #' Compare retained and excluded respondents on covariates
 #'
 #' Selecting respondents by participation completeness can bias a sample
@@ -270,12 +294,7 @@ weasel_selectivity <- function(plan_obj, scenario, vars = NULL, data = NULL,
                       stringsAsFactors = FALSE)
     names(agg) <- c(id, wave)
     for (v in vars) {
-      x    <- as.numeric(sub[[v]][o])
-      sums <- rowsum(ifelse(is.na(x), 0, x), grp)
-      cnts <- rowsum(as.numeric(!is.na(x)), grp)
-      m    <- as.numeric(sums / cnts)
-      m[cnts == 0] <- NA_real_
-      agg[[v]] <- m
+      agg[[v]] <- .weasel_pair_mean(sub[[v]][o], grp)
     }
     sub <- agg
   }
