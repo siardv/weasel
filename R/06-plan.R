@@ -433,8 +433,14 @@ weasel_compare_to_sentence <- function(cmp, digits = 3) {
 #'   span; all retention proportions are relative to
 #'   `"observed_in_span"`), `fingerprint` (a structural fingerprint of
 #'   the data: aggregate counts plus an order-invariant digest of the
-#'   deduplicated (id, wave) assignments, used to detect mismatched
-#'   reunions later; the guard applies only when data are supplied
+#'   deduplicated (id, wave) assignments across the full supplied panel,
+#'   excluding covariate values; new fingerprints record
+#'   `encoding_version = 2` and preserve supported ID values exactly,
+#'   independently of numeric display options. Saved fingerprints without
+#'   a version retain their historical encoding and limitations; rebuild
+#'   from verified original data to create a new fingerprint. A mismatch
+#'   warns without replanning or changing stored scenario IDs; the guard
+#'   applies only when data are supplied
 #'   explicitly to [weasel_apply()], [weasel_summarize_subset()], or
 #'   [weasel_selectivity()], since the attached-data path cannot
 #'   mismatch by construction), `id`, and `wave`. When

@@ -96,8 +96,14 @@ distinct ids in the data, ids and unique pairs observed in the
 span; all retention proportions are relative to
 \code{"observed_in_span"}), \code{fingerprint} (a structural fingerprint of
 the data: aggregate counts plus an order-invariant digest of the
-deduplicated (id, wave) assignments, used to detect mismatched
-reunions later; the guard applies only when data are supplied
+deduplicated (id, wave) assignments across the full supplied panel,
+excluding covariate values; new fingerprints record
+\code{encoding_version = 2} and preserve supported ID values exactly,
+independently of numeric display options. Saved fingerprints without
+a version retain their historical encoding and limitations; rebuild
+from verified original data to create a new fingerprint. A mismatch
+warns without replanning or changing stored scenario IDs; the guard
+applies only when data are supplied
 explicitly to \code{\link[=weasel_apply]{weasel_apply()}}, \code{\link[=weasel_summarize_subset]{weasel_summarize_subset()}}, or
 \code{\link[=weasel_selectivity]{weasel_selectivity()}}, since the attached-data path cannot
 mismatch by construction), \code{id}, and

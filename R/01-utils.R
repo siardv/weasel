@@ -477,16 +477,9 @@ the <- new.env(parent = emptyenv())
   invisible(plan_obj)
 }
 
-# order-invariant digest of the deduplicated (id, wave) assignments;
-# two panels share it exactly when they share the same incidence
-# structure, so aggregate-count collisions cannot slip past the guard.
-# the byte stream is canonical and locale-independent: ids as UTF-8
-# character, waves as integers, pairs radix-sorted (byte order, not
-# collation order), joined with unit/record separators under a
-# versioned prefix, and hashed with base R's tools::md5sum(). the
-# threat model is accidental drift, not adversarial collision, so md5
-# through a mature base implementation is appropriate and the package
-# stays dependency-free.
+# historical v1 stream, preserved for fingerprints without a version;
+# display formatting and unescaped separators have known weaknesses.
+# do not strengthen this route using information an old plan never stored
 .weasel_pair_hash <- function(ids_chr, waves_int) {
   o <- order(ids_chr, waves_int, method = "radix")
   stream <- paste0(
@@ -502,12 +495,88 @@ the <- new.env(parent = emptyenv())
   unname(tools::md5sum(f))
 }
 
+# exact binary64 keys in portable byte order; R equality treats both
+# signs of zero as the same identifier, including complex components
+.weasel_double_key <- function(x) {
+  x <- as.double(x)
+  if (length(x) == 0L) return(character(0))
+  x[!is.na(x) & x == 0] <- 0
+  bytes <- writeBin(x, raw(), size = 8L, endian = "big")
+  hex <- sprintf("%02x", 0:255)[as.integer(bytes) + 1L]
+  hex <- matrix(hex, nrow = 8L)
+  do.call(paste0, lapply(seq_len(8L), function(i) hex[i, ]))
+}
+
+# ASCII keys retain primitive identity rather than printed labels;
+# factors share character labels, dates/times retain their stored
+# numerical precision, and bytes-marked strings differ from UTF-8 text
+.weasel_id_key <- function(ids) {
+  if (length(ids) == 0L) return(character(0))
+  if (is.factor(ids)) ids <- as.character(ids)
+  if (is.character(ids)) {
+    values <- unique(ids)
+    encoding <- Encoding(values)
+    text <- iconv(values, to = "UTF-8", sub = NA_character_)
+    tags <- rep("c", length(values))
+    tags[encoding == "bytes"] <- "b"
+    # invalid native bytes must not turn into literal display escapes;
+    # in a UTF-8 locale they have the same identity as marked UTF-8
+    tags[is.na(text) & encoding == "unknown" &
+           !l10n_info()[["UTF-8"]]] <- "u"
+    original <- is.na(text) | encoding == "bytes"
+    text[original] <- values[original]
+    hex <- vapply(text, function(x) {
+      paste0(format(charToRaw(x)), collapse = "")
+    }, character(1), USE.NAMES = FALSE)
+    keys <- paste0(tags, hex)
+    return(keys[match(ids, values)])
+  }
+  if (is.logical(ids)) return(paste0("l", as.integer(ids)))
+  if (is.complex(ids)) {
+    return(paste0("z", .weasel_double_key(Re(ids)),
+                  .weasel_double_key(Im(ids))))
+  }
+  paste0("n", .weasel_double_key(ids))
+}
+
+# length-framed exact keys and integer waves, sorted by ASCII key and
+# wave; md5 remains an accidental-drift guard, not authentication
+.weasel_pair_hash_v2 <- function(ids, waves_int) {
+  keys <- .weasel_id_key(ids)
+  o <- order(keys, waves_int, method = "radix")
+  stream <- paste0(
+    "weasel-fp-v2\x1e",
+    if (length(o) == 0L) "" else {
+      paste0(nchar(keys[o], type = "bytes"), ":", keys[o], ":",
+             as.character(waves_int[o]), ";", collapse = "")
+    }
+  )
+  f <- tempfile("weasel-fp-")
+  on.exit(unlink(f), add = TRUE)
+  con <- file(f, open = "wb")
+  writeBin(charToRaw(stream), con)
+  close(con)
+  unname(tools::md5sum(f))
+}
+
+.weasel_fingerprint_version <- function(version) {
+  if (!typeof(version) %in% c("integer", "double") ||
+      length(version) != 1L || !is.null(attributes(version)) ||
+      is.na(version) || !version %in% c(1, 2)) {
+    .weasel_stop(
+      "unsupported fingerprint encoding version; use a supported ",
+      "weasel version or rebuild the plan from verified original data.",
+      class = "weasel_error_fingerprint_version"
+    )
+  }
+  as.integer(version)
+}
+
 # structural fingerprint of a panel, cheap and order-invariant; used to
 # detect when a saved plan is reunited with data it was not built from.
-# the descriptive counts make mismatch warnings informative; pair_hash
-# (added in 0.4.1) digests the actual deduplicated (id, wave)
-# assignments, so swapped participation with identical counts is caught
-.weasel_data_fingerprint <- function(data, id, wave) {
+# retain the exact v1 list for old saved plans; new plans record v2
+.weasel_data_fingerprint <- function(data, id, wave, encoding_version = 2L) {
+  version <- .weasel_fingerprint_version(encoding_version)
   ok   <- !is.na(data[[id]]) & !is.na(data[[wave]])
   ids0 <- data[[id]][ok]
   w0   <- as.integer(round(as.numeric(data[[wave]][ok])))
@@ -515,15 +584,21 @@ the <- new.env(parent = emptyenv())
   idsu <- ids0[dd$idx]
   wu   <- w0[dd$idx]
   waves <- sort(unique(wu))
-  list(
+  fp <- list(
     n_rows         = nrow(data),
     n_pairs        = length(wu),
     n_ids          = length(unique(idsu)),
     id_type        = class(data[[id]])[1],
     waves          = waves,
     pairs_per_wave = as.integer(table(factor(wu, levels = waves))),
-    pair_hash      = .weasel_pair_hash(as.character(idsu), wu)
+    pair_hash      = if (version == 1L) {
+      .weasel_pair_hash(as.character(idsu), wu)
+    } else {
+      .weasel_pair_hash_v2(idsu, wu)
+    }
   )
+  if (version == 2L) fp$encoding_version <- 2L
+  fp
 }
 
 # compare the stored fingerprint against explicitly supplied data and
@@ -531,11 +606,14 @@ the <- new.env(parent = emptyenv())
 # fingerprint and are accepted silently. exactly the fields the stored
 # fingerprint carries are compared: legacy plans saved before 0.4.1
 # have no pair_hash and keep their documented acceptance behavior,
-# while new plans are additionally guarded by the pair digest
+# absent version means v1; never migrate a saved fingerprint in place
 .weasel_check_fingerprint <- function(plan_obj, data, id, wave) {
   fp <- plan_obj[["fingerprint"]]
   if (is.null(fp)) return(invisible(TRUE))
-  now <- .weasel_data_fingerprint(data, id, wave)
+  versioned <- "encoding_version" %in% names(fp)
+  version <- if (versioned) fp[["encoding_version"]] else 1L
+  now <- .weasel_data_fingerprint(data, id, wave, encoding_version = version)
+  if (versioned) now$encoding_version <- version
   now <- now[names(fp)]
   same <- identical(fp, now)
   if (!same) {

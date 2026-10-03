@@ -1,5 +1,15 @@
 # weasel (development version)
 
+* Newly created plans use versioned structural fingerprints with exact,
+  unambiguous identifier encoding. Distinct numeric IDs and IDs containing
+  separator characters now retain their identity, and numeric display options
+  no longer cause false mismatch warnings. Explicitly supplied data still warn
+  once (`weasel_data_mismatch`) on structural drift, retaining the saved
+  scenario IDs without replanning or changing the plan. Existing saved
+  fingerprints without an encoding version retain their historical checks and
+  encoding limitations; rebuilding from verified original data creates a new
+  fingerprint. Unsupported encoding versions raise
+  `weasel_error_fingerprint_version` rather than choosing a legacy encoding.
 * `weasel_selectivity()` now preserves a common finite covariate value when
   all non-missing values in a duplicated respondent-wave pair are identical.
   Rounding while averaging copies could previously create artificial spread

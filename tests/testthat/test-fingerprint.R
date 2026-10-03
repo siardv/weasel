@@ -193,6 +193,9 @@ test_that("legacy plans without a pair digest keep the documented behavior", {
   # a plan whose stored fingerprint predates pair_hash: only the fields
   # the stored fingerprint carries are compared
   p <- fp_plan()
+  p$fingerprint <- weasel:::.weasel_data_fingerprint(
+    fp_d1(), "id", "time", encoding_version = 1L
+  )
   p$fingerprint$pair_hash <- NULL
   expect_no_warning(weasel_apply(p, "strict", data = fp_d1()))
   # count-identical swapped data passed a 0.4.0 fingerprint, and must
@@ -225,7 +228,8 @@ test_that("attached-data workflows never consult the fingerprint", {
 test_that("the v1 fingerprint keeps its saved representation", {
   # fixed digest of the canonical v1 bytes for A: 1,2,3 and B: 1,2
   expect_identical(
-    weasel:::.weasel_data_fingerprint(fp_d1(), "id", "time"),
+    weasel:::.weasel_data_fingerprint(fp_d1(), "id", "time",
+                                     encoding_version = 1L),
     list(n_rows = 5L, n_pairs = 5L, n_ids = 2L, id_type = "character",
          waves = 1:3, pairs_per_wave = c(2L, 2L, 1L),
          pair_hash = "bd26387f0367c182b8b6c7a36377e3d2")
@@ -316,4 +320,152 @@ test_that("row counts and id types guard reunion even with an unchanged digest",
       }
     }
   }
+})
+
+test_that("new fingerprints record the exact v2 format", {
+  # independently framed UTF-8 bytes for A: 1,2,3 and B: 1,2
+  expect_identical(
+    weasel:::.weasel_data_fingerprint(fp_d1(), "id", "time"),
+    list(n_rows = 5L, n_pairs = 5L, n_ids = 2L, id_type = "character",
+         waves = 1:3, pairs_per_wave = c(2L, 2L, 1L),
+         pair_hash = "025e7633f42330f4a2e21bea611719b9",
+         encoding_version = 2L)
+  )
+  # exact binary64 encodings, with equality's common zero identity
+  expect_identical(
+    weasel:::.weasel_id_key(c(1, 1 + .Machine$double.eps, 0, -0)),
+    c("n3ff0000000000000", "n3ff0000000000001",
+      "n0000000000000000", "n0000000000000000")
+  )
+})
+
+test_that("v2 distinguishes exact numeric and time assignment changes", {
+  values <- list(
+    epsilon = c(1, 1 + .Machine$double.eps),
+    large = c(1e15, 1e15 + 1),
+    complex = complex(real = c(1, 1 + .Machine$double.eps), imaginary = 2),
+    date = structure(c(1, 1 + .Machine$double.eps), class = "Date"),
+    time = structure(c(1, 1 + .Machine$double.eps),
+                     class = c("POSIXct", "POSIXt"), tzone = "UTC")
+  )
+  for (value in values) {
+    d <- data.frame(id = value[c(1, 1, 1, 2, 2)], time = c(1, 2, 3, 1, 2))
+    changed <- d
+    changed$id[3] <- value[2]
+    before <- weasel:::.weasel_data_fingerprint(d, "id", "time")
+    after <- weasel:::.weasel_data_fingerprint(changed, "id", "time")
+    expect_identical(before[setdiff(names(before), "pair_hash")],
+                     after[setdiff(names(after), "pair_hash")])
+    expect_false(identical(before$pair_hash, after$pair_hash))
+    # historical fingerprints retain precisely their original weakness
+    expect_identical(
+      weasel:::.weasel_data_fingerprint(d, "id", "time", 1L),
+      weasel:::.weasel_data_fingerprint(changed, "id", "time", 1L)
+    )
+  }
+})
+
+test_that("v2 frames separator-containing character IDs unambiguously", {
+  left <- data.frame(id = c("A\x1f2\x1eB", "C", "D"), time = c(2L, 3L, 4L))
+  right <- data.frame(id = c("A", "B\x1f2\x1eC", "D"), time = c(2L, 3L, 4L))
+  expect_identical(
+    weasel:::.weasel_data_fingerprint(left, "id", "time", 1L),
+    weasel:::.weasel_data_fingerprint(right, "id", "time", 1L)
+  )
+  expect_false(identical(
+    weasel:::.weasel_data_fingerprint(left, "id", "time")$pair_hash,
+    weasel:::.weasel_data_fingerprint(right, "id", "time")$pair_hash
+  ))
+  for (ids in list(c("", ":;\x1e\x1f"), c("1", "01"))) {
+    expect_length(unique(weasel:::.weasel_id_key(ids)), 2L)
+  }
+})
+
+test_that("v2 preserves supported equality and ignores display options", {
+  original_options <- options()
+  on.exit(options(original_options), add = TRUE)
+  d <- data.frame(id = c(1e-7, 1.25, 1e15, Inf, -Inf), time = 1:5)
+  expected <- weasel:::.weasel_data_fingerprint(d, "id", "time")
+  for (settings in list(list(scipen = 999), list(OutDec = ","),
+                       list(digits = 3), list(scipen = -9, digits = 22))) {
+    options(settings)
+    expect_identical(weasel:::.weasel_data_fingerprint(d, "id", "time"),
+                     expected)
+  }
+  options(original_options)
+  hash <- function(ids) {
+    weasel:::.weasel_data_fingerprint(
+      data.frame(id = ids, time = seq_along(ids)), "id", "time"
+    )$pair_hash
+  }
+  expect_identical(hash(1:3), hash(as.double(1:3)))
+  expect_identical(hash(c(0, 1)), hash(c(-0, 1)))
+  expect_identical(hash(complex(real = c(0, 1), imaginary = c(-0, 2))),
+                   hash(complex(real = c(-0, 1), imaginary = c(0, 2))))
+  expect_identical(hash(structure(1:3, class = "Date")),
+                   hash(structure(as.double(1:3), class = "Date")))
+  instants <- structure(c(1, 1.25, 2), class = c("POSIXct", "POSIXt"),
+                        tzone = "UTC")
+  other_zone <- instants
+  attr(other_zone, "tzone") <- "Europe/Amsterdam"
+  expect_identical(hash(instants), hash(other_zone))
+  expect_identical(weasel:::.weasel_id_key(c(TRUE, FALSE)), c("l1", "l0"))
+  # empty/missing pairs have one stream regardless of underlying ID type
+  for (ids in list(character(), integer(), numeric(), logical(), complex())) {
+    expect_identical(hash(ids), "6abfd28ec19277783ec2b0562fde8506")
+  }
+  missing <- data.frame(id = c(NA_real_, NaN, 1), time = c(1, 2, NA))
+  expect_identical(weasel:::.weasel_data_fingerprint(missing, "id", "time")$pair_hash,
+                   hash(numeric()))
+})
+
+test_that("v2 honors character encoding identity across tested locales", {
+  original_locale <- Sys.getlocale("LC_CTYPE")
+  original_collation <- Sys.getlocale("LC_COLLATE")
+  on.exit(Sys.setlocale("LC_CTYPE", original_locale), add = TRUE)
+  on.exit(Sys.setlocale("LC_COLLATE", original_collation), add = TRUE)
+  utf8 <- "\u00e9"
+  Encoding(utf8) <- "UTF-8"
+  latin1 <- rawToChar(as.raw(233))
+  Encoding(latin1) <- "latin1"
+  bytes <- utf8
+  Encoding(bytes) <- "bytes"
+  hash <- function(id) {
+    weasel:::.weasel_data_fingerprint(data.frame(id = id, time = 1L),
+                                     "id", "time")$pair_hash
+  }
+  expected <- hash(utf8)
+  for (locale in c("C", "C.UTF-8", "en_US.UTF-8")) {
+    if (suppressWarnings(Sys.setlocale("LC_CTYPE", locale)) == "") next
+    suppressWarnings(Sys.setlocale("LC_COLLATE", locale))
+    expect_identical(hash(utf8), expected)
+    expect_identical(hash(latin1), expected)
+    expect_false(identical(hash(bytes), expected))
+    invalid <- rawToChar(as.raw(195))
+    # no accepted native byte string may become a literal display escape
+    expect_false(identical(hash(invalid), hash("<c3>")))
+    marked_invalid <- invalid
+    Encoding(marked_invalid) <- "UTF-8"
+    expect_false(identical(hash(marked_invalid), hash("<c3>")))
+    expect_identical(identical(hash(invalid), hash(marked_invalid)),
+                     isTRUE(invalid == marked_invalid))
+  }
+})
+
+test_that("v2 normalizes participation keys and excludes covariate values", {
+  d <- fp_d1()
+  original <- weasel:::.weasel_data_fingerprint(d, "id", "time")
+  near <- d
+  near$time <- near$time + 1e-9
+  near$var1 <- rev(near$var1)
+  expect_identical(weasel:::.weasel_data_fingerprint(near, "id", "time"),
+                   original)
+  with_missing <- rbind(d, data.frame(id = NA_character_, time = 9, var1 = 0))
+  changed_missing <- with_missing
+  changed_missing$time[6] <- 15
+  expect_identical(
+    weasel:::.weasel_data_fingerprint(with_missing, "id", "time"),
+    weasel:::.weasel_data_fingerprint(changed_missing, "id", "time")
+  )
+  expect_no_warning(weasel_apply(fp_plan(), "strict", data = near))
 })
