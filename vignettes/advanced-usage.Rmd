@@ -200,15 +200,20 @@ nrow(weasel_apply(p_light, "lenient", data = long_data))
 `weasel_sensitivity()` and `weasel_justify_subset()` keep working on
 such plans because they only need the stored metrics.
 
-Reuniting a saved plan with the wrong data is guarded: every plan
-stores a structural fingerprint of the data it was built from,
-including an order-invariant digest of the deduplicated (id, wave)
-assignments, and explicitly supplied data are checked against it. The
-digest catches even panels whose aggregate counts coincide with the
-original (for example, participation swapped between respondents), and
-the guard applies exactly where a mismatch is possible: when data are
-passed back in explicitly. A mismatch produces a classed warning
-(`weasel_data_mismatch`) rather than a silent, invalid subset:
+New plans store a structural fingerprint with `encoding_version = 2`:
+aggregate counts plus an order-invariant digest of the deduplicated
+(id, wave) assignments across the full supplied panel, including waves
+outside the selected window. The encoding preserves supported ID values
+exactly, including distinct numeric values and strings containing separator
+characters, and does not depend on numeric display options. Covariate
+values are excluded. The guard checks explicitly supplied data; reuse of
+attached data assumes the original attached object.
+
+A structural mismatch, including reassigned participation with unchanged
+aggregate counts, produces one classed warning (`weasel_data_mismatch`).
+The result still uses the stored scenario IDs: the guard does not replan,
+change the saved plan or ensure that changed data satisfy the original
+scenario. Review the warning before using the result:
 
 ```{r}
 d_other <- long_data[-(1:10), ]
@@ -218,6 +223,18 @@ msg <- tryCatch(
 )
 substr(msg, 1, 78)
 ```
+
+Saved plans are checked using their recorded encoding version. Fingerprints
+without a version retain the historical v1 encoding, including its loss of
+some numeric ID distinctions, ambiguous separator framing and dependence on
+numeric display options. Older count-only fingerprints compare their stored fields;
+plans without a fingerprint have no structural guard. No saved fingerprint is
+silently upgraded. Rebuild a plan from its verified original data to create a
+new fingerprint. An unsupported or malformed encoding version raises
+`weasel_error_fingerprint_version` rather than falling back to v1.
+
+The fingerprint is an accidental-drift diagnostic, not authentication of
+covariate values or protection against deliberate tampering.
 
 ## Span selection in detail
 

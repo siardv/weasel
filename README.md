@@ -109,10 +109,14 @@ strictly between a respondent's first and last observed wave).
 * `weasel_scope_info()` prints the state of the active scope.
 * Plans record their planning population (the denominator behind every
   retention figure) and a structural fingerprint of their data,
-  including an order-invariant digest of the deduplicated (id, wave)
-  assignments; reuniting a saved plan with explicitly re-supplied data
-  that differ, even when every aggregate count coincides, warns
-  (`weasel_data_mismatch`).
+  including a versioned, order-invariant digest of the deduplicated
+  (id, wave) assignments. New fingerprints preserve supported ID values
+  exactly and do not depend on numeric display options. Reuniting a saved
+  plan with explicitly re-supplied data that differ structurally warns
+  (`weasel_data_mismatch`) and keeps the stored scenario IDs. Older plans
+  retain their recorded checks and encoding limitations; rebuild from
+  verified original data to create a new fingerprint. Covariate values
+  are not fingerprinted.
 
 ## Options
 
