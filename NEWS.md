@@ -1,4 +1,8 @@
-# weasel (development version)
+# weasel 0.4.3
+
+This patch release strengthens input validation, saved-plan data checks and
+generated explanations, and corrects dummy-data and duplicate-pair edge cases.
+Runtime dependencies and exported function signatures are unchanged.
 
 * Newly created plans use versioned structural fingerprints with exact,
   unambiguous identifier encoding. Distinct numeric IDs and IDs containing
@@ -69,6 +73,10 @@
   values, including outside the selected window and when reusing saved plans.
   Missing values and near-integer rounding retain their existing behavior;
   `Inf` scenario tolerances remain supported.
+* Help and vignettes now clarify comparison-relative scenario scores and
+  recommendation ties, observed-wave covariate summaries, and the descriptive
+  limits of standardized mean differences; regression tests cover these
+  documented contracts.
 
 # weasel 0.4.2
 
