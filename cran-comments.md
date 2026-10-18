@@ -45,14 +45,44 @@ offline, modified check setup. Its HTML-tool and leftover-directory NOTEs
 are historical limitations, not results of the completed native check above.
 The native check includes the repaired TeX fonts and Homebrew HTML Tidy.
 
-## Windows and R-devel verification pending
+## Completed cross-platform CI verification
 
-The same archive was uploaded to win-builder for both R-release and R-devel
-on 2026-10-17. Both HTTPS upload responses acknowledged the expected filename
-and size. Check completion, actual R versions, platforms, results and log
-locations have not yet been obtained; upload acknowledgements are not passes.
-Record and review those results before resubmission. Historical 0.4.3 checks
-do not validate this 0.4.4 archive.
+On 2026-10-18, all five jobs in
+[R-CMD-check run 39108642407](https://github.com/siardv/weasel/actions/runs/39108642407)
+completed with `Status: OK` (0 errors, 0 warnings, 0 NOTEs):
+
+| Platform | Actual R | Log |
+| --- | --- | --- |
+| Windows, x86_64-w64-mingw32 | 4.6.1 (2026-06-24 ucrt) | [Windows release](https://github.com/siardv/weasel/actions/runs/39108642407/job/117619820173) |
+| Ubuntu 24.04.5 LTS, x86_64-pc-linux-gnu | Under development (2026-10-16 r90685) | [R-devel](https://github.com/siardv/weasel/actions/runs/39108642407/job/117619820271) |
+| Ubuntu 24.04.5 LTS, x86_64-pc-linux-gnu | 4.6.1 (2026-06-24) | [Linux release](https://github.com/siardv/weasel/actions/runs/39108642407/job/117619820278) |
+| Ubuntu 24.04.5 LTS, x86_64-pc-linux-gnu | 4.5.3 (2026-03-11) | [Linux oldrel](https://github.com/siardv/weasel/actions/runs/39108642407/job/117619820214) |
+| macOS Tahoe 26.6.2, aarch64-apple-darwin23 | 4.6.1 (2026-06-24) | [macOS release](https://github.com/siardv/weasel/actions/runs/39108642407/job/117619820377) |
+
+The tested correction is commit
+`af6599c25fe63b8ee3ade996887f2383ae8f5c40`. CI checked out PR merge
+`c7c8bccd6e77778e16dd4adc94038f9eefd35578`; its complete tree
+`acbbefa928f7ddbdca6cf974571f2774de30a023` is identical to that correction.
+Every job rebuilt `weasel_0.4.4.tar.gz` from this source. Successful jobs
+retained snapshot artifacts, not the rebuilt source archives, so their
+archive checksums are unavailable. These are source-matched platform checks,
+not checks of byte-identical copies of the native archive above.
+
+CI used `--no-manual --as-cran`, with `NOT_CRAN=true` and incoming checks
+disabled. Its results complement the native manual/incoming check rather
+than replace it. Test summaries report 0 failures, 0 warnings and 0 skips;
+Windows reports 3,872 assertions and the other platforms report 3,878.
+These observed counts are recorded separately from the native reports.
+Inclusion policy, all nine guide snippets, guide semantics, source version
+coherence and test coverage checks also pass. Measured coverage is 94.25%.
+
+## Separate win-builder uploads
+
+The native archive above was also uploaded to win-builder for R-release and
+R-devel on 2026-10-17. Both HTTPS responses acknowledged its filename and
+size, but the emailed result links have not been obtained. Those uploads
+remain unverified separately from the completed CI checks; acknowledgements
+are not passes. Historical 0.4.3 checks are not used as 0.4.4 evidence.
 
 ## Source provenance
 
