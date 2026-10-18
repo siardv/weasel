@@ -1057,9 +1057,55 @@ function copyCode(btn) {
     });
 }
 
+// appearance follows the system until a user explicitly selects a theme
+function initTheme() {
+  const root = document.documentElement;
+  const toggle = document.getElementById("theme-toggle");
+  const systemTheme = window.matchMedia("(prefers-color-scheme: dark)");
+
+  function updateToggle() {
+    const dark = root.dataset.theme === "dark" ||
+      (!root.dataset.theme && systemTheme.matches);
+    toggle.setAttribute("aria-pressed", String(dark));
+    toggle.title = dark ? "Switch to light mode" : "Switch to dark mode";
+  }
+
+  toggle.addEventListener("click", () => {
+    const theme = toggle.getAttribute("aria-pressed") === "true" ? "light" : "dark";
+    root.dataset.theme = theme;
+    try {
+      localStorage.setItem("weasel-theme", theme);
+    } catch (e) {
+      // manual switching still works when storage is unavailable
+    }
+    updateToggle();
+  });
+
+  systemTheme.addEventListener("change", updateToggle);
+  window.addEventListener("storage", (event) => {
+    if (event.key !== "weasel-theme" && event.key !== null) return;
+    try {
+      if (event.storageArea !== localStorage) return;
+    } catch (e) {
+      // no shared preference can be read when storage is unavailable
+      return;
+    }
+    if (event.newValue === "light" || event.newValue === "dark") {
+      root.dataset.theme = event.newValue;
+    } else {
+      delete root.dataset.theme;
+    }
+    updateToggle();
+  });
+
+  updateToggle();
+  toggle.hidden = false;
+}
+
 // init
 
 document.addEventListener("DOMContentLoaded", () => {
+  initTheme();
   const rawHash = location.hash.replace(/^#/, "");
   state = stateFromUrl();
   if (rawHash && state.current === "start") {
