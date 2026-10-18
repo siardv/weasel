@@ -11,6 +11,7 @@
 !/CITATION.cff
 !/NEWS.md
 !/README.md
+!/cran-comments.md
 
 # package source, help, tests, and vignette sources
 !/R/

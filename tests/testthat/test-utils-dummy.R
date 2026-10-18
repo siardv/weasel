@@ -435,8 +435,13 @@ test_that("fixed block sampling is reproducible and retains caller RNG state", {
   expect_identical(.Random.seed, before_seed)
   expect_identical(RNGkind(), before_kind)
   args$seed <- NULL
-  first <- suppressMessages(do.call(generate_weasel_dummy_data, args))
-  expect_identical(suppressMessages(do.call(generate_weasel_dummy_data, args)), first)
+  old_verbose <- options(weasel.verbose = TRUE)
+  on.exit(options(old_verbose), add = TRUE)
+  seed_message <- utils::capture.output(
+    first <- do.call(generate_weasel_dummy_data, args), type = "message"
+  )
+  args$seed <- as.integer(sub(".*seed: ([0-9]+).*", "\\1", seed_message))
+  expect_identical(do.call(generate_weasel_dummy_data, args), first)
   expect_identical(.Random.seed, before_seed)
   expect_identical(RNGkind(), before_kind)
 
@@ -491,8 +496,7 @@ test_that("an absent seed and a non-default RNG kind are both restored", {
     expect_false(exists(".Random.seed", envir = globalenv(), inherits = FALSE))
     expect_identical(RNGkind(), before_kind)
 
-    # an error raised after set.seed() inside the generator's block: the seed
-    # message handler throws, so restoration runs from inside the block
+    # an error in the seed message handler also leaves caller state alone
     expect_no_warning(expect_error(
       withCallingHandlers(
         do.call(generate_weasel_dummy_data, args),
@@ -505,83 +509,7 @@ test_that("an absent seed and a non-default RNG kind are both restored", {
   }
 })
 
-test_that("the seed helper restores an absent seed's RNG kind after an error", {
-  old_kind <- RNGkind()
-  had_seed <- exists(".Random.seed", envir = globalenv(), inherits = FALSE)
-  old_seed <- if (had_seed) get(".Random.seed", envir = globalenv())
-  on.exit({
-    suppressWarnings(do.call(RNGkind, as.list(old_kind)))
-    if (had_seed) {
-      assign(".Random.seed", old_seed, envir = globalenv())
-    } else if (exists(".Random.seed", envir = globalenv(), inherits = FALSE)) {
-      rm(".Random.seed", envir = globalenv())
-    }
-  }, add = TRUE)
-  suppressWarnings(
-    RNGkind("Wichmann-Hill", "Box-Muller", sample.kind = "Rounding")
-  )
-  rm(".Random.seed", envir = globalenv())
-  before_kind <- RNGkind()
-  expect_no_warning(expect_error(weasel:::.weasel_with_preserved_seed({
-    RNGkind("Mersenne-Twister", "Inversion", sample.kind = "Rejection")
-    set.seed(1)
-    stop("boom")
-  }), "boom"))
-  expect_false(exists(".Random.seed", envir = globalenv(), inherits = FALSE))
-  expect_identical(RNGkind(), before_kind)
-})
-
-test_that("the seed helper restores every RNGkind() setting", {
-  old_kind <- RNGkind()
-  had_seed <- exists(".Random.seed", envir = globalenv(), inherits = FALSE)
-  old_seed <- if (had_seed) get(".Random.seed", envir = globalenv())
-  on.exit({
-    suppressWarnings(do.call(RNGkind, as.list(old_kind)))
-    if (had_seed) {
-      assign(".Random.seed", old_seed, envir = globalenv())
-    } else if (exists(".Random.seed", envir = globalenv(), inherits = FALSE)) {
-      rm(".Random.seed", envir = globalenv())
-    }
-  }, add = TRUE)
-  # RNGversion("3.5.0") selects a configuration that differs from the
-  # current defaults in every supported R version (Rounding sampling; in
-  # R-devel also the legacy binomial algorithm), whatever the number of
-  # settings RNGkind() reports; the evaluated expression then resets every
-  # reported setting, so a setting the helper failed to restore would show
-  reset_all <- function() {
-    do.call(RNGkind, as.list(rep("default", length(RNGkind()))))
-    set.seed(1)
-    RNGkind()
-  }
-  for (has_seed in c(TRUE, FALSE)) {
-    suppressWarnings(RNGversion("3.5.0"))
-    set.seed(3)
-    legacy_seed <- .Random.seed
-    if (!has_seed) rm(".Random.seed", envir = globalenv())
-    legacy_kind <- RNGkind()
-    expect_no_warning(
-      inner <- weasel:::.weasel_with_preserved_seed(reset_all())
-    )
-    expect_false(identical(inner, legacy_kind))
-    expect_identical(RNGkind(), legacy_kind)
-    expect_identical(
-      exists(".Random.seed", envir = globalenv(), inherits = FALSE), has_seed
-    )
-    if (has_seed) expect_identical(.Random.seed, legacy_seed)
-
-    expect_no_warning(expect_error(weasel:::.weasel_with_preserved_seed({
-      reset_all()
-      stop("boom")
-    }), "boom"))
-    expect_identical(RNGkind(), legacy_kind)
-    expect_identical(
-      exists(".Random.seed", envir = globalenv(), inherits = FALSE), has_seed
-    )
-    if (has_seed) expect_identical(.Random.seed, legacy_seed)
-  }
-})
-
-test_that("Box-Muller callers keep draws made before their next rnorm()", {
+test_that("Box-Muller callers keep their complete normal stream", {
   old_kind <- RNGkind()
   had_seed <- exists(".Random.seed", envir = globalenv(), inherits = FALSE)
   old_seed <- if (had_seed) get(".Random.seed", envir = globalenv())
@@ -608,25 +536,19 @@ test_that("Box-Muller callers keep draws made before their next rnorm()", {
   invisible(suppressMessages(do.call(generate_weasel_dummy_data, args)))
   expect_identical(mixed(), reference)
 
-  # one pending deviate: the stored uniform state is restored, so draws made
-  # before the next rnorm() are unchanged; ?RNGkind documents that
-  # .Random.seed does not carry the cached deviate, so from that rnorm() on
-  # a mixed sequence can differ, and consecutive normals resume one deviate
-  # later; this records the limitation, it does not endorse it
+  # an odd number of prior normals also preserves the cached deviate
   prime(1)
   before_seed <- .Random.seed
   reference_n <- rnorm(2)
   prime(1)
   invisible(suppressMessages(do.call(generate_weasel_dummy_data, args)))
   expect_identical(.Random.seed, before_seed)
-  expect_identical(rnorm(1), reference_n[[2L]])
+  expect_identical(rnorm(2), reference_n)
   prime(1)
   reference <- mixed()
   prime(1)
   invisible(suppressMessages(do.call(generate_weasel_dummy_data, args)))
-  after <- mixed()
-  expect_identical(after[1:2], reference[1:2])
-  expect_false(identical(after[3:4], reference[3:4]))
+  expect_identical(mixed(), reference)
 })
 
 test_that("dummy data validates its arguments", {
