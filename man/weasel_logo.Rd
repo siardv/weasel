@@ -10,8 +10,9 @@ weasel_logo()
 \code{NULL}, invisibly.
 }
 \description{
-Prints a coloured ASCII art logo to the console. Colour ordering is
-randomised cosmetically without affecting the caller's RNG state.
+Displays a coloured ASCII art logo as a message. Colours rotate without
+using R's random-number generator. Suppress the display with
+\code{suppressMessages()} or \code{options(weasel.verbose = FALSE)}.
 }
 \examples{
 weasel_logo()

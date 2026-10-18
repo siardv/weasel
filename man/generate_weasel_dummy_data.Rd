@@ -32,8 +32,8 @@ is not supplied, \code{n_times} must be greater than 2.}
 from 1 to 2147483647.}
 
 \item{prop_random}{Probability that any given (respondent, wave)
-observation is skipped at random. Like every \code{prop_*} parameter,
-it must be a single number in \code{[0, 1]}; invalid values fail
+observation is skipped at random. Like every \verb{prop_*} parameter,
+it must be a single number in \verb{[0, 1]}; invalid values fail
 immediately, before any random draw.}
 
 \item{prop_attention}{Asymptotic probability of attention-related
@@ -78,9 +78,10 @@ these labels. Analyse such data with \code{grid = "observed"} in
 \item{seed}{Random seed; a single integer-valued number between
 -2147483647 and 2147483647 (fractional and non-numeric values are
 rejected before \code{set.seed()} is reached). If \code{NULL}, a seed is drawn
-and reported so the data set can be regenerated. A given seed
-reproduces the same panel
-regardless of the caller's \code{RNGkind()}; see Details.}
+in the separate process and reported so the data set can be regenerated.
+Repeated calls with \code{seed = NULL} can produce different data. A given
+explicit seed reproduces the same panel regardless of the caller's
+\code{RNGkind()}; see Details.}
 }
 \value{
 A data frame in long format with columns \code{id}, \code{time}, and
@@ -99,19 +100,16 @@ can be added on top.
 }
 \details{
 The returned grid is therefore deliberately incomplete; this is what
-both weasel pipelines analyse. The function has no net effect on the
-caller's RNG state: the state present before the call (including the
-\code{RNGkind()} setting) is restored on exit, and reproducibility is
-controlled through \code{seed}. Internally the generator pins the RNG
-configuration to \code{RNGkind("Mersenne-Twister", "Inversion", sample.kind = "Rejection")}, the R >= 3.6 defaults, so a given seed
-reproduces the same panel even when the caller uses a non-default
-sampler (for example \code{sample.kind = "Rounding"}). One limitation comes
-from R itself: \code{.Random.seed} does not store the cached second deviate
-of the \code{"Box-Muller"} normal generator (see \code{?RNGkind}), so a caller's
-pending cached deviate is not restored. Subsequent draws that use the
-normal generator, including \code{rnorm()} and \code{rlnorm()}, and draws
-interleaved with them may therefore differ from an uninterrupted
-stream; only draws made before the first such call are unaffected.
+both weasel pipelines analyse. Synthetic draws run in a separate R
+process from the same R installation. The caller's \code{.Random.seed},
+\code{RNGkind()} configuration and cached Box-Muller normal deviate remain
+untouched; no bindings are created or changed in the caller's global
+environment. The generator pins the separate process to
+\code{RNGkind("Mersenne-Twister", "Inversion", sample.kind = "Rejection")},
+the R >= 3.6 defaults, so an explicit seed reproduces the same panel
+regardless of the caller's RNG configuration. Each call incurs R process
+startup time. Temporary request, script and result files are removed on
+exit, including when generation fails.
 }
 \examples{
 d <- generate_weasel_dummy_data(n_ids = 50, n_times = 8, seed = 1)

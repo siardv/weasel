@@ -27,7 +27,8 @@ The standard display function used at every stage of both pipelines.
 Output is produced with base R only, so it is identical regardless of
 which optional packages are installed. List columns (such as the
 per-scenario \code{ids} column of a plan table) are hidden from display
-and reported by name instead.
+and reported by name instead. Set \code{options(weasel.verbose = FALSE)}
+to suppress display while retaining the formatted return value.
 }
 \examples{
 df <- data.frame(a = 1:5, b = rnorm(5))

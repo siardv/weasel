@@ -4,55 +4,18 @@
 
 .weasel_palette <- c("green", "red", "yellow", "blue", "magenta", "cyan")
 
-# evaluate expr under the package's private cosmetic rng stream: the
-# caller's .Random.seed is saved and restored exactly, while the
-# private stream persists in the package state and advances across
-# calls. a plain save/restore would replay the caller's state on every
-# draw and freeze the colours; a persistent private stream keeps them
-# rotating without ever touching the caller's sequence
-#' @noRd
-.weasel_with_cosmetic_seed <- function(expr) {
-  has_seed <- exists(".Random.seed", envir = globalenv(), inherits = FALSE)
-  old_seed <- if (has_seed) {
-    get(".Random.seed", envir = globalenv(), inherits = FALSE)
-  }
-  on.exit({
-    if (exists(".Random.seed", envir = globalenv(), inherits = FALSE)) {
-      the$cosmetic_seed <- get(".Random.seed", envir = globalenv(),
-                               inherits = FALSE)
-    }
-    if (has_seed) {
-      assign(".Random.seed", old_seed, envir = globalenv())
-    } else if (exists(".Random.seed", envir = globalenv(), inherits = FALSE)) {
-      rm(".Random.seed", envir = globalenv())
-    }
-  }, add = TRUE)
-  if (!is.null(the$cosmetic_seed)) {
-    assign(".Random.seed", the$cosmetic_seed, envir = globalenv())
-  } else {
-    # first cosmetic draw of the session: seed the private stream from
-    # the wall clock (millisecond resolution) and the process id
-    RNGkind(kind = "Mersenne-Twister", normal.kind = "Inversion",
-            sample.kind = "Rejection")
-    seed_val <- as.numeric(Sys.time()) * 1000 + Sys.getpid()
-    set.seed(as.integer(seed_val %% .Machine$integer.max))
-  }
-  expr
-}
-
-# random colour ordering with the colours in ... never first; drawn
-# from the private cosmetic stream so repeated calls keep rotating and
-# the caller's RNG stream is never perturbed
+# rotate colours using only package-private state; excluded colours
+# never appear first, and no random draws or global seed writes occur
 #' @noRd
 sample_colors <- function(...) {
   excluded <- as.character(c(...))
-  .weasel_with_cosmetic_seed({
-    head_pool <- setdiff(.weasel_palette, excluded)
-    if (length(head_pool) == 0) head_pool <- .weasel_palette
-    first <- sample(head_pool, 1)
-    rest <- setdiff(.weasel_palette, first)
-    c(first, sample(rest))
-  })
+  offset <- .weasel_or(the$color_index, 0L)
+  the$color_index <- (offset + 1L) %% 30L
+  head_pool <- setdiff(.weasel_palette, excluded)
+  if (length(head_pool) == 0) head_pool <- .weasel_palette
+  first <- head_pool[offset %% length(head_pool) + 1L]
+  rest <- setdiff(.weasel_palette, first)
+  c(first, rest[(seq_along(rest) + offset - 1L) %% length(rest) + 1L])
 }
 
 # apply a cli colour if the console supports ansi colours, otherwise
@@ -90,7 +53,7 @@ colorize_output <- function(l, ascii = FALSE, version = FALSE,
     out <- paste0(out, "\n\n ", str_colorize(paste0("(v", v, ")"), "silver"), "\n")
   }
   if (save) return(out)
-  cat(out, "\n", sep = "")
+  .weasel_msg(out)
   invisible(NULL)
 }
 
@@ -104,8 +67,9 @@ weasel_text <- function(pre = NULL, post = NULL, not_first = "green") {
 
 #' Display the weasel ASCII logo
 #'
-#' Prints a coloured ASCII art logo to the console. Colour ordering is
-#' randomised cosmetically without affecting the caller's RNG state.
+#' Displays a coloured ASCII art logo as a message. Colours rotate without
+#' using R's random-number generator. Suppress the display with
+#' `suppressMessages()` or `options(weasel.verbose = FALSE)`.
 #'
 #' @return `NULL`, invisibly.
 #'

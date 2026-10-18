@@ -189,10 +189,11 @@ assert_weasel_scope <- function() {
 
 #' Inspect the active weasel scope
 #'
-#' Prints a compact status report of the active scope: the bound data,
+#' Displays a compact status report of the active scope: the bound data,
 #' the grid and span, the structural constraints, and how far the
-#' pipeline has progressed. Prints "no active weasel scope." when no
-#' scope is set.
+#' pipeline has progressed. Reports "no active weasel scope." when no
+#' scope is set. Suppress the message with `suppressMessages()` or
+#' `options(weasel.verbose = FALSE)`.
 #'
 #' @return Invisibly, a list with the scope settings (`id`, `wave`,
 #'   `grid`, `lower`, `upper`, `span`, `min_present`, `max_missing`,
@@ -212,18 +213,20 @@ assert_weasel_scope <- function() {
 #' @export
 weasel_scope_info <- function() {
   if (is.null(the$scope)) {
-    cat("no active weasel scope.\n")
+    .weasel_msg("no active weasel scope.")
     return(invisible(NULL))
   }
   env <- the$scope
 
-  cat("weasel scope\n")
-  cat("  data:        ", nrow(env$data), " rows; id = '", env$id,
-      "', wave = '", env$wave, "'\n", sep = "")
-  cat("  grid:        ", env$grid, "\n", sep = "")
+  lines <- c(
+    "weasel scope",
+    paste0("  data:        ", nrow(env$data), " rows; id = '", env$id,
+           "', wave = '", env$wave, "'"),
+    paste0("  grid:        ", env$grid)
+  )
   if (!is.null(env$span)) {
-    cat("  span:        ", env$lower, ":", env$upper,
-        " (", length(env$span), " waves)\n", sep = "")
+    lines <- c(lines, paste0("  span:        ", env$lower, ":", env$upper,
+                              " (", length(env$span), " waves)"))
   } else {
     req <- if (!is.null(env$lower) || !is.null(env$upper)) {
       paste0(" (requested ", .weasel_or(env$lower, "min"), ":",
@@ -231,7 +234,7 @@ weasel_scope_info <- function() {
     } else {
       ""
     }
-    cat("  span:        not evaluated yet", req, "\n", sep = "")
+    lines <- c(lines, paste0("  span:        not evaluated yet", req))
   }
   cons <- character(0)
   if (env$min_present > 1) {
@@ -249,16 +252,16 @@ weasel_scope_info <- function() {
   if (isTRUE(env$require_endpoints)) {
     cons <- c(cons, "endpoints required")
   }
-  cat("  constraints: ",
-      if (length(cons) > 0) paste(cons, collapse = ", ") else "none",
-      "\n", sep = "")
+  lines <- c(lines, paste0("  constraints: ",
+    if (length(cons) > 0) paste(cons, collapse = ", ") else "none"))
   stage <- c(
     "set",
     if (!is.null(env$span)) "evaluated",
     if (!is.null(env$pivot)) paste0("reshaped (", nrow(env$pivot), " kept)"),
     if (!is.null(env$view)) paste0("summarized (", nrow(env$view), " patterns)")
   )
-  cat("  stage:       ", paste(stage, collapse = " -> "), "\n", sep = "")
+  lines <- c(lines, paste0("  stage:       ", paste(stage, collapse = " -> ")))
+  .weasel_msg(paste(lines, collapse = "\n"))
 
   invisible(list(
     id = env$id, wave = env$wave, grid = env$grid,
