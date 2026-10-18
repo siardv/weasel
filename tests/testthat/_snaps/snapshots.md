@@ -17,7 +17,7 @@
 
     Code
       weasel_scope_info()
-    Output
+    Message
       weasel scope
         data:        42 rows; id = 'id', wave = 'time'
         grid:        consecutive

@@ -106,7 +106,8 @@ strictly between a respondent's first and last observed wave).
 * `weasel_selectivity()` compares retained and excluded respondents on
   covariates (standardized mean differences) to check whether
   completeness-based selection skews the sample.
-* `weasel_scope_info()` prints the state of the active scope.
+* `weasel_scope_info()` returns the active settings invisibly and displays
+  a suppressible status message.
 * Plans record their planning population (the denominator behind every
   retention figure) and a structural fingerprint of their data,
   including a versioned, order-invariant digest of the deduplicated
@@ -120,7 +121,16 @@ strictly between a respondent's first and last observed wave).
 
 ## Options
 
-`options(weasel.verbose = FALSE)` silences all status messages.
+`options(weasel.verbose = FALSE)` silences status messages, the logo, the
+full demonstration and explicit table displays while retaining their return
+values. `suppressMessages()` also suppresses scope reports, the logo and the
+demonstration. Explicit printers such as `print(plan)` remain printers; use
+the option above to quiet `weasel_print_table()`.
+
+Synthetic data are generated in a separate R process, leaving the caller's
+global workspace and random-number stream untouched. Explicit seeds retain
+their reproducible panels. With `seed = NULL`, a seed is drawn independently
+and reported for reproduction. Each generation call incurs R startup time.
 
 ## A note on how this package was built
 

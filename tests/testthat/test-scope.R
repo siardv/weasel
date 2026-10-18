@@ -135,13 +135,15 @@ test_that("scope pipeline supports observed grids", {
 })
 
 test_that("weasel_scope_info reports settings and pipeline stage", {
+  old <- options(weasel.verbose = TRUE)
+  on.exit(options(old), add = TRUE)
   weasel_clear_scope()
-  expect_output(weasel_scope_info(), "no active")
+  expect_message(weasel_scope_info(), "no active")
 
   d <- make_fixture()
   set_weasel_scope(d, "id", "time", max_gap_len = 1, min_present = 1)
   on.exit(weasel_clear_scope(), add = TRUE)
-  out <- capture.output(info <- weasel_scope_info())
+  out <- utils::capture.output(info <- weasel_scope_info(), type = "message")
   expect_true(any(grepl("stage:", out)))
   expect_true(any(grepl("not evaluated yet", out)))
   expect_equal(info$max_gap_len, 1L)
@@ -149,7 +151,7 @@ test_that("weasel_scope_info reports settings and pipeline stage", {
 
   weasel_reshape_to_wide()
   weasel_summarize_waves()
-  out2 <- capture.output(info2 <- weasel_scope_info())
+  out2 <- utils::capture.output(info2 <- weasel_scope_info(), type = "message")
   expect_true(any(grepl("summarized", out2)))
   expect_false(is.na(info2$n_kept))
   expect_equal(length(info2$span), 8L)

@@ -38,22 +38,25 @@ the <- new.env(parent = emptyenv())
 
 .weasel_msg <- function(...) {
   if (!.weasel_verbose()) return(invisible(NULL))
-  text <- paste0(...)
-  if (.weasel_cli()) cli::cli_inform(text) else message(text)
+  message(paste0(...))
   invisible(NULL)
 }
 
 .weasel_ok <- function(...) {
   if (!.weasel_verbose()) return(invisible(NULL))
   text <- paste0(...)
-  if (.weasel_cli()) cli::cli_alert_success(text) else message(paste0("ok: ", text))
+  if (.weasel_cli()) {
+    cli::cli_alert_success("{text}")
+  } else {
+    message(paste0("ok: ", text))
+  }
   invisible(NULL)
 }
 
 .weasel_h2 <- function(text) {
   if (!.weasel_verbose()) return(invisible(NULL))
   if (.weasel_cli()) {
-    cli::cli_rule(left = text)
+    message(cli::rule(left = text))
   } else {
     w <- max(getOption("width", 72L), nchar(text) + 6L)
     dashes <- paste(rep("-", max(w - nchar(text) - 3L, 3L)), collapse = "")
@@ -667,34 +670,6 @@ the <- new.env(parent = emptyenv())
 
 .weasel_maybe_round <- function(x, digits = 3) {
   if (is.numeric(x)) round(x, digits) else x
-}
-
-# evaluate expr without leaving a net change in the caller's RNG state;
-# saving/restoring .Random.seed in globalenv is the sanctioned mechanism.
-# without a stored seed the caller's RNGkind() lives only in R's in-memory
-# generator settings, which removing .Random.seed does not reset, so that
-# configuration is captured on entry and put back through RNGkind()
-.weasel_with_preserved_seed <- function(expr) {
-  has_seed <- exists(".Random.seed", envir = globalenv(), inherits = FALSE)
-  old_seed <- if (has_seed) get(".Random.seed", envir = globalenv(), inherits = FALSE)
-  old_kind <- if (!has_seed) RNGkind()
-  on.exit({
-    if (has_seed) {
-      assign(".Random.seed", old_seed, envir = globalenv())
-    } else {
-      # selecting a kind writes a .Random.seed of its own, so restore the
-      # configuration first and remove that seed afterwards. every setting
-      # RNGkind() reports is passed back positionally, which also covers
-      # settings added by later R versions (binom.kind in R-devel); base R
-      # warns whenever a legacy setting such as the Rounding sampler is
-      # selected, hence suppressWarnings()
-      suppressWarnings(do.call(RNGkind, as.list(old_kind)))
-      if (exists(".Random.seed", envir = globalenv(), inherits = FALSE)) {
-        rm(".Random.seed", envir = globalenv())
-      }
-    }
-  }, add = TRUE)
-  expr
 }
 
 #' Deprecated functions

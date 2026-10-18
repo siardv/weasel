@@ -14,10 +14,11 @@ counters (\code{n_rows}, \code{n_kept}, \code{n_patterns}), or \code{NULL} when 
 scope is active.
 }
 \description{
-Prints a compact status report of the active scope: the bound data,
+Displays a compact status report of the active scope: the bound data,
 the grid and span, the structural constraints, and how far the
-pipeline has progressed. Prints "no active weasel scope." when no
-scope is set.
+pipeline has progressed. Reports "no active weasel scope." when no
+scope is set. Suppress the message with \code{suppressMessages()} or
+\code{options(weasel.verbose = FALSE)}.
 }
 \examples{
 d <- generate_weasel_dummy_data(n_ids = 30, n_times = 6, seed = 1)
