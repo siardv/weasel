@@ -1,3 +1,24 @@
+# weasel 0.4.4
+
+This patch addresses CRAN review of examples, console output and global
+workspace changes. Dependencies and exported signatures are unchanged.
+
+* The short `weasel_example()` help example runs normally instead of using
+  `\dontrun{}`.
+* Scope reports, the logo, headings and demonstration tables use suppressible
+  messages. `options(weasel.verbose = FALSE)` also suppresses explicit table
+  display while retaining the formatted return value.
+* Cosmetic colours rotate through package-private state without random draws.
+  Synthetic data draws run in a separate R process, avoiding changes to the
+  caller's global bindings, RNG configuration and cached Box-Muller normals.
+  Explicit seeds preserve the existing sampled panels. With `seed = NULL`,
+  the separate process draws and reports its own seed; repeated calls can
+  produce different panels. Each call incurs process startup time, and its
+  temporary files are removed on exit, including errors.
+* Selection rules, scores, diagnostics and generated justifications are
+  unchanged. Regression tests cover quiet output, locked global workspaces,
+  complete RNG continuity and temporary-file cleanup.
+
 # weasel 0.4.3
 
 This patch release strengthens input validation, saved-plan data checks and

@@ -4,7 +4,8 @@
 #' Output is produced with base R only, so it is identical regardless of
 #' which optional packages are installed. List columns (such as the
 #' per-scenario `ids` column of a plan table) are hidden from display
-#' and reported by name instead.
+#' and reported by name instead. Set `options(weasel.verbose = FALSE)`
+#' to suppress display while retaining the formatted return value.
 #'
 #' @param x A data frame to print.
 #' @param title Optional character string displayed as a heading above
@@ -35,8 +36,6 @@ weasel_print_table <- function(x, title = NULL, digits = 3, n = NULL) {
   digits <- .weasel_check_count(digits, "digits")
   n <- .weasel_check_count(n, "n")
 
-  if (!is.null(title)) .weasel_h2(title)
-
   is_list_col <- vapply(x, is.list, logical(1))
   y <- x[!is_list_col]
   for (nm in names(y)) y[[nm]] <- .weasel_maybe_round(y[[nm]], digits = digits)
@@ -45,11 +44,14 @@ weasel_print_table <- function(x, title = NULL, digits = 3, n = NULL) {
     y <- y[seq_len(min(nrow(y), n)), , drop = FALSE]
   }
 
-  print(y, row.names = FALSE)
-  if (any(is_list_col)) {
-    cat("(list column(s) not shown: ",
-        paste(names(x)[is_list_col], collapse = ", "), ")\n", sep = "")
+  if (.weasel_verbose()) {
+    if (!is.null(title)) .weasel_h2(title)
+    print(y, row.names = FALSE)
+    if (any(is_list_col)) {
+      cat("(list column(s) not shown: ",
+          paste(names(x)[is_list_col], collapse = ", "), ")\n", sep = "")
+    }
+    cat("\n")
   }
-  cat("\n")
   invisible(y)
 }

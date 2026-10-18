@@ -379,9 +379,19 @@ p_quiet <- weasel_plan(long_data, "id", "time", span = "full")
 options(weasel.verbose = TRUE)
 ```
 
-The data generator and the cosmetic console colours preserve your RNG
-state, so calling weasel functions never shifts the random numbers your
-own analysis draws afterwards:
+The data generator runs synthetic draws in a separate R process, while
+console colours rotate using package-private state without random draws.
+Neither writes to the caller's global workspace. The caller's random-number
+stream, RNG configuration and cached Box-Muller normal deviate remain
+untouched. Explicit seeds reproduce the same panels as before. Without a
+seed, each generation process draws and reports its own seed; repeated calls
+can produce different panels. Each call incurs R process startup time, and
+temporary files are removed on exit, including errors.
+
+You can also use `suppressMessages()` for the logo, scope report and full
+demonstration. Quiet mode suppresses explicit table display too, while
+retaining its formatted return value. For example, generation leaves your
+analysis stream unchanged:
 
 ```{r}
 set.seed(99)

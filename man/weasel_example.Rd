@@ -16,11 +16,10 @@ and \code{sensitivity}, invisibly.
 \description{
 Exercises both the scope-based pipeline and the planning interface on
 synthetic dummy data, including the sensitivity diagnostic, then
-cleans up the scope.
+cleans up the scope. Display is suppressible with \code{suppressMessages()}
+or \code{options(weasel.verbose = FALSE)}; results are still returned.
 }
 \examples{
-\dontrun{
 res <- weasel_example(seed = 42)
-}
 
 }
