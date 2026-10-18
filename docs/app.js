@@ -108,16 +108,16 @@ const TREE = {
 
   plan_span_justify: {
     type: "question",
-    shortLabel: "Fixed wave count",
+    shortLabel: "Common analysis window",
     question:
-      "Does your model require a fixed number of consecutive waves, for example a growth-curve or latent-trajectory model?",
+      "Do you want a common fixed-length analysis window?",
     explanation:
       "`span = \"core\"` asks weasel to locate the highest-coverage consecutive window of " +
-      "a specified length (`core_len`, default 6). This ensures every respondent in the " +
-      "analysis is observed within the same bounded segment of the panel. " +
-      "`span = \"full\"` includes every observed wave and is appropriate when the wave count " +
-      "need not be fixed, for example in random-intercept models or survival analyses " +
-      "where respondents can have different observation lengths. To supply your own window, " +
+      "a specified length (`core_len`, default 6). A common window does not mean every " +
+      "respondent is observed at every wave: balanced and lenient scenarios allow missing " +
+      "waves. Complete participation requires `max_missing = 0`, as in `anchored_strict`. " +
+      "This counts row presence, not non-missing outcomes. `span = \"full\"` uses the full " +
+      "wave range; completeness still depends on the scenario. To supply your own window, " +
       "skip `span` and pass explicit `lower`/`upper` bounds instead. The justification text " +
       "describes the bounds as user-supplied, without inferring when or why they were chosen.",
     yes: {
@@ -132,14 +132,15 @@ const TREE = {
 
   plan_span: {
     type: "question",
-    shortLabel: "Fixed wave count",
-    question: "Does your model require a fixed number of consecutive waves?",
+    shortLabel: "Common analysis window",
+    question: "Do you want a common fixed-length analysis window?",
     explanation:
       "`span = \"core\"` selects the densest consecutive window of fixed length. " +
-      "This is typically the right choice for growth-curve models or any design " +
-      "where a uniform set of L waves per respondent is analytically important. " +
-      "`span = \"full\"` covers all observed waves and gives you the widest longitudinal " +
-      "window at the cost of greater within-window missingness variability. A window fixed " +
+      "Every selected respondent shares that window, but balanced and lenient scenarios " +
+      "allow missing waves within it. Complete participation requires `max_missing = 0`, " +
+      "as in `anchored_strict`; row presence does not ensure non-missing outcomes. " +
+      "`span = \"full\"` covers the full wave range, with completeness again determined " +
+      "by the scenario. A window fixed " +
       "by the study design can be supplied directly as explicit `lower`/`upper` bounds " +
       "instead of `span`.",
     yes: {
@@ -352,7 +353,8 @@ head(subset1)`,
       "waves, both endpoints required), `anchored_balanced` (at most 1 missing, both endpoints), " +
       "and `lenient_info_max` (at most 2 missing, endpoints not required), scoring each on " +
       "coverage, endpoint rate, and gap structure. Review the scored table and choose the " +
-      "scenario that best fits your analytical requirements.",
+      "scenario that best fits your analytical requirements. A shared window does not " +
+      "ensure complete participation: only the strict preset requires every wave.",
     steps: [
       {
         fn: 'weasel_plan(data, "id", "time", span = "core")',
@@ -360,23 +362,23 @@ head(subset1)`,
       },
       {
         fn: "weasel_compare_scenarios(p)",
-        note: "compute composite scores; the highest-scoring scenario is flagged as `recommended`",
+        note: "inspect the recommendation; stop if none retains respondents, then deliberately reconsider the window or criteria",
       },
       {
-        fn: 'weasel_summarize_subset(p, scenario, data, "id", "time")',
+        fn: 'weasel_summarize_subset(p, chosen_scenario, data, "id", "time")',
         note: "audit per-wave coverage and missingness distribution before extracting data",
       },
       {
-        fn: "weasel_apply(p, scenario)",
+        fn: "weasel_apply(p, chosen_scenario)",
         note: "produce the filtered long-format data frame for the chosen scenario",
       },
       {
-        fn: "weasel_sensitivity(p, max_missing = 0:2)",
-        note: "sweep the tolerances: how strongly does the retained sample react?",
+        fn: "weasel_sensitivity(p, require_endpoints = TRUE, max_missing = 0:2, n_gap_max = 1, max_gap_len = 1)",
+        note: "one-factor sweep: vary missing-wave tolerance while holding endpoint and gap requirements fixed",
       },
       {
-        fn: 'weasel_selectivity(p, "anchored_strict")',
-        note: "compare retained and excluded respondents on covariates (standardized mean differences)",
+        fn: "weasel_selectivity(p, chosen_scenario, vars = diagnostic_vars)",
+        note: "optional: deliberately choose eligible numeric/logical covariates and check that retained and excluded groups support a comparison",
       },
     ],
     code: `library(weasel)
@@ -388,24 +390,53 @@ cmp <- weasel_compare_scenarios(p)
 weasel_print_table(cmp, title = "Scenario comparison")
 cat(weasel_compare_to_sentence(cmp), "\\n")
 
-rec <- cmp$scenario[cmp$recommended]
-s   <- weasel_summarize_subset(p, rec, d, "id", "time")
+chosen_scenario <- cmp$scenario[which(cmp$recommended %in% TRUE & cmp$n_ids > 0)]
+if (length(chosen_scenario) != 1L || is.na(chosen_scenario) ||
+    !chosen_scenario %in% p$plan$scenario) {
+  stop("No single recommended scenario. Inspect cmp and deliberately revise the window or criteria before continuing.")
+}
+s <- weasel_summarize_subset(p, chosen_scenario, d, "id", "time")
 weasel_print_table(s$headline)
 weasel_print_table(s$per_wave_coverage, title = "Per-wave coverage")
 
-analysis_data <- weasel_apply(p, rec)
+analysis_data <- weasel_apply(p, chosen_scenario)
 dim(analysis_data)
 
-# audit the selection before committing to it
-weasel_print_table(weasel_sensitivity(p, max_missing = 0:2), n = 8)
-weasel_print_table(weasel_selectivity(p, "anchored_strict"), digits = 3)`,
+# one-factor sweep: hold endpoint and gap requirements fixed
+sens <- weasel_sensitivity(p, require_endpoints = TRUE,
+  max_missing = 0:2, n_gap_max = 1, max_gap_len = 1)
+weasel_print_table(sens, title = "Missing-wave tolerance (other requirements fixed)")
+
+# optional: replace character(0) with deliberately chosen covariate names
+diagnostic_vars <- character(0)
+chosen_ids <- p$plan$ids[[match(chosen_scenario, p$plan$scenario)]]
+excluded_ids <- setdiff(p$id_metrics[[p$id]], chosen_ids)
+if (length(chosen_ids) < 2L || length(excluded_ids) < 2L) {
+  message("Selectivity skipped: need at least two retained and two excluded respondents.")
+} else if (length(diagnostic_vars) == 0L) {
+  message("Selectivity skipped: choose numeric/logical covariates to compare.")
+} else {
+  eligible <- setdiff(names(d)[vapply(d, function(x) is.numeric(x) || is.logical(x),
+    logical(1))], c(p$id, p$wave))
+  if (!all(diagnostic_vars %in% eligible)) {
+    stop("Choose numeric/logical covariates other than the id and wave columns.")
+  }
+  sel <- weasel_selectivity(p, chosen_scenario, vars = diagnostic_vars, at = "first")
+  weasel_print_table(sel, digits = 3)
+}`,
     note:
       "`recommended` marks the highest composite score under the declared weights, nothing " +
       "more: check the `near_tie` column and `attr(cmp, \"score_components\")` before treating " +
       "it as a decision, and inspect `p$span_candidates` to see every window the core rule " +
       "considered (exact coverage ties warn and pick the earliest). For biennial or " +
       "year-labelled panels add `grid = \"observed\"`; for a design-fixed window pass explicit " +
-      "`lower`/`upper` bounds instead of `span`.",
+      "`lower`/`upper` bounds instead of `span`. If no scenario retains anyone, the code " +
+      "stops before summary or extraction; inspect the table and deliberately reconsider " +
+      "the window or criteria. Selectivity is optional: set `diagnostic_vars` only after " +
+      "choosing relevant numeric/logical covariates. `at = \"first\"` uses each respondent's " +
+      "first observed wave in the span, not necessarily a shared baseline. Inspect the " +
+      "per-covariate counts: missing summaries can reduce them, and an SMD needs at least " +
+      "two non-missing summaries per group and a non-zero pooled standard deviation.",
   },
 
   result_plan_full: {
@@ -415,9 +446,10 @@ weasel_print_table(weasel_selectivity(p, "anchored_strict"), digits = 3)`,
     heading: "Plan pipeline: full span",
     summary:
       "All observed waves are included in the evaluation window. Scenarios are scored " +
-      "against the complete panel range. Use this when your model does not require a " +
-      "fixed wave count, or when retaining the widest possible observation window " +
-      "matters more than within-window completeness.",
+      "against the complete panel range. Use this when the full range is your intended " +
+      "analysis window. This does not require complete observation at every wave: " +
+      "balanced and lenient scenarios allow missing waves; `anchored_strict` requires " +
+      "complete participation through `max_missing = 0`.",
     steps: [
       {
         fn: 'weasel_plan(data, "id", "time", span = "full")',
@@ -425,14 +457,14 @@ weasel_print_table(weasel_selectivity(p, "anchored_strict"), digits = 3)`,
       },
       {
         fn: "weasel_compare_scenarios(p)",
-        note: "score and rank scenarios; inspect the `recommended` flag",
+        note: "inspect the recommendation; stop if none retains respondents, then deliberately reconsider the window or criteria",
       },
       {
-        fn: 'weasel_summarize_subset(p, scenario, data, "id", "time")',
+        fn: 'weasel_summarize_subset(p, chosen_scenario, data, "id", "time")',
         note: "verify per-wave coverage and missingness statistics for the chosen scenario",
       },
       {
-        fn: "weasel_apply(p, scenario)",
+        fn: "weasel_apply(p, chosen_scenario)",
         note: "extract the analysis-ready long-format data frame",
       },
     ],
@@ -445,14 +477,22 @@ cmp <- weasel_compare_scenarios(p)
 weasel_print_table(cmp, title = "Full-span scenarios")
 cat(weasel_compare_to_sentence(cmp), "\\n")
 
-s <- weasel_summarize_subset(p, "anchored_balanced", d, "id", "time")
+chosen_scenario <- cmp$scenario[which(cmp$recommended %in% TRUE & cmp$n_ids > 0)]
+if (length(chosen_scenario) != 1L || is.na(chosen_scenario) ||
+    !chosen_scenario %in% p$plan$scenario) {
+  stop("No single recommended scenario. Inspect cmp and deliberately revise the window or criteria before continuing.")
+}
+
+s <- weasel_summarize_subset(p, chosen_scenario, d, "id", "time")
 cat(weasel_subset_to_sentence(s), "\\n")
 
-analysis_data <- weasel_apply(p, "anchored_balanced")
+analysis_data <- weasel_apply(p, chosen_scenario)
 dim(analysis_data)
 
-# how sensitive is the sample to the tolerances?
-weasel_print_table(weasel_sensitivity(p, max_missing = 0:2), n = 8)`,
+# one-factor sweep: hold endpoint and gap requirements fixed
+sens <- weasel_sensitivity(p, require_endpoints = TRUE,
+  max_missing = 0:2, n_gap_max = 1, max_gap_len = 1)
+weasel_print_table(sens, title = "Missing-wave tolerance (other requirements fixed)")`,
     note:
       "Plans carry their data by default; use `keep_data = FALSE` before saving with " +
       "`saveRDS()` and pass the data back in later. Reunions are guarded: explicitly supplied " +
@@ -473,7 +513,9 @@ weasel_print_table(weasel_sensitivity(p, max_missing = 0:2), n = 8)`,
       "select a scenario, and generate a structured paragraph for your methods section. " +
       "`weasel_justify_subset()` produces text in three verbosity styles and adds a " +
       "formal in-text citation automatically. Designed for pre-registered studies and " +
-      "manuscripts where the data-preparation stage must be documented transparently.",
+      "manuscripts where the data-preparation stage must be documented transparently. " +
+      "A fixed window does not ensure complete records: balanced and lenient scenarios " +
+      "allow missing waves; `anchored_strict` uses `max_missing = 0` for complete participation.",
     steps: [
       {
         fn: 'weasel_plan(data, "id", "time", span = "core")',
@@ -481,18 +523,18 @@ weasel_print_table(weasel_sensitivity(p, max_missing = 0:2), n = 8)`,
       },
       {
         fn: "weasel_compare_scenarios(p)",
-        note: "compute composite scores; use the `recommended` flag as a starting point, not a final decision",
+        note: "inspect the recommendation as a starting point; stop if none retains respondents and deliberately reconsider the window or criteria",
       },
       {
-        fn: 'weasel_summarize_subset(p, scenario, data, "id", "time")',
+        fn: 'weasel_summarize_subset(p, chosen_scenario, data, "id", "time")',
         note: "inspect headline statistics, per-wave coverage, and missingness distribution before committing",
       },
       {
-        fn: "weasel_apply(p, scenario)",
+        fn: "weasel_apply(p, chosen_scenario)",
         note: "extract the filtered long-format data frame",
       },
       {
-        fn: "weasel_justify_subset(p, scenario)",
+        fn: "weasel_justify_subset(p, chosen_scenario)",
         note: 'generate the methods paragraph; `style` controls verbosity: `"methods"` (default), `"concise"`, or `"extended"`',
       },
     ],
@@ -504,20 +546,26 @@ p   <- weasel_plan(d, "id", "time", span = "core")
 cmp <- weasel_compare_scenarios(p)
 weasel_print_table(cmp, title = "Scenario comparison")
 
-s <- weasel_summarize_subset(p, "anchored_balanced", d, "id", "time")
+chosen_scenario <- cmp$scenario[which(cmp$recommended %in% TRUE & cmp$n_ids > 0)]
+if (length(chosen_scenario) != 1L || is.na(chosen_scenario) ||
+    !chosen_scenario %in% p$plan$scenario) {
+  stop("No single recommended scenario. Inspect cmp and deliberately revise the window or criteria before continuing.")
+}
+
+s <- weasel_summarize_subset(p, chosen_scenario, d, "id", "time")
 weasel_print_table(s$headline)
 
-analysis_data <- weasel_apply(p, "anchored_balanced")
+analysis_data <- weasel_apply(p, chosen_scenario)
 
 # full methods-section paragraph; the in-text citation
 # (package author and year) is added automatically
-cat(weasel_justify_subset(p, "anchored_balanced"), "\\n")
+cat(weasel_justify_subset(p, chosen_scenario), "\\n")
 
 # short summary for supplementary material
-cat(weasel_justify_subset(p, "anchored_balanced", style = "concise"), "\\n")
+cat(weasel_justify_subset(p, chosen_scenario, style = "concise"), "\\n")
 
 # without the citation
-cat(weasel_justify_subset(p, "anchored_balanced", cite = FALSE), "\\n")`,
+cat(weasel_justify_subset(p, chosen_scenario, cite = FALSE), "\\n")`,
     note:
       'Three verbosity styles are available: `"methods"` (full paragraph, default), ' +
       '`"concise"` (short summary, suitable for supplementary sections), and ' +
@@ -536,7 +584,9 @@ cat(weasel_justify_subset(p, "anchored_balanced", cite = FALSE), "\\n")`,
       "Evaluate scenarios over all available waves and produce a fully documented, " +
       "reproducible selection. The paragraph from `weasel_justify_subset()` will describe " +
       "the full observed wave range, the structural constraints applied, and the resulting " +
-      "sample-size and coverage statistics.",
+      "sample-size and coverage statistics. Balanced and lenient scenarios allow missing " +
+      "waves within that range; complete participation requires `max_missing = 0`, as in " +
+      "`anchored_strict`.",
     steps: [
       {
         fn: 'weasel_plan(data, "id", "time", span = "full")',
@@ -544,18 +594,18 @@ cat(weasel_justify_subset(p, "anchored_balanced", cite = FALSE), "\\n")`,
       },
       {
         fn: "weasel_compare_scenarios(p)",
-        note: "display and inspect the scored scenario table",
+        note: "inspect the recommendation; stop if none retains respondents, then deliberately reconsider the window or criteria",
       },
       {
-        fn: 'weasel_summarize_subset(p, scenario, data, "id", "time")',
+        fn: 'weasel_summarize_subset(p, chosen_scenario, data, "id", "time")',
         note: "verify coverage statistics for the chosen scenario",
       },
       {
-        fn: "weasel_apply(p, scenario)",
+        fn: "weasel_apply(p, chosen_scenario)",
         note: "produce the analysis-ready data frame",
       },
       {
-        fn: "weasel_justify_subset(p, scenario)",
+        fn: "weasel_justify_subset(p, chosen_scenario)",
         note: "generate the methods paragraph documenting window bounds, constraints, and statistics",
       },
     ],
@@ -567,10 +617,16 @@ p   <- weasel_plan(d, "id", "time", span = "full")
 cmp <- weasel_compare_scenarios(p)
 weasel_print_table(cmp, title = "Full-span scenarios")
 
-analysis_data <- weasel_apply(p, "anchored_balanced")
+chosen_scenario <- cmp$scenario[which(cmp$recommended %in% TRUE & cmp$n_ids > 0)]
+if (length(chosen_scenario) != 1L || is.na(chosen_scenario) ||
+    !chosen_scenario %in% p$plan$scenario) {
+  stop("No single recommended scenario. Inspect cmp and deliberately revise the window or criteria before continuing.")
+}
+
+analysis_data <- weasel_apply(p, chosen_scenario)
 
 # the citation (package author and year) is included automatically
-cat(weasel_justify_subset(p, "anchored_balanced"), "\\n")`,
+cat(weasel_justify_subset(p, chosen_scenario), "\\n")`,
     note:
       "The in-text citation is automatic; supply `author` and `year` only to " +
       'override it, or `cite = FALSE` to omit it. Style options: `"methods"` ' +
@@ -602,11 +658,11 @@ cat(weasel_justify_subset(p, "anchored_balanced"), "\\n")`,
         note: "compute composite scores and flag the recommended scenario",
       },
       {
-        fn: 'weasel_summarize_subset(p, "anchored_balanced", d, "id", "time")',
+        fn: 'weasel_summarize_subset(p, chosen_scenario, d, "id", "time")',
         note: "audit headline statistics, per-wave coverage, and the missingness distribution",
       },
       {
-        fn: 'weasel_apply(p, "anchored_balanced")',
+        fn: 'weasel_apply(p, chosen_scenario)',
         note: "extract the filtered long-format data frame",
       },
     ],
@@ -620,12 +676,13 @@ cmp <- weasel_compare_scenarios(p)
 weasel_print_table(cmp, title = "Scenario comparison")
 cat(weasel_compare_to_sentence(cmp), "\\n")
 
-s <- weasel_summarize_subset(p, "anchored_balanced", d, "id", "time")
+chosen_scenario <- "anchored_balanced"  # deliberate example choice; inspect cmp first
+s <- weasel_summarize_subset(p, chosen_scenario, d, "id", "time")
 weasel_print_table(s$headline, title = "Subset headline")
 weasel_print_table(s$per_wave_coverage, title = "Per-wave coverage")
 cat(weasel_subset_to_sentence(s), "\\n")
 
-balanced <- weasel_apply(p, "anchored_balanced")
+balanced <- weasel_apply(p, chosen_scenario)
 dim(balanced)`,
     note:
       "The three default scenarios retain different samples because the synthetic panel " +

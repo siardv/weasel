@@ -2,11 +2,10 @@
 #
 # the guide-snippets workflow proves every guide snippet *executes*;
 # executability and semantic agreement are different guarantees, and
-# this script covers the second one for the recipe where they can
-# drift: the bounded-scope recipe filters the pattern table and then
-# extracts data, so the pattern it displays and the pattern it
-# extracts must be the same pattern. run from the repository root with
-# the package installed (CI runs it after the snippet step).
+# this script also checks that displayed selections, diagnostics and
+# prose describe the same sample, including targeted edge cases. run
+# from the repository root with the package installed and Node.js
+# available (CI runs it after the snippet step).
 
 options(weasel.verbose = FALSE)
 suppressMessages(library(weasel))
@@ -67,3 +66,253 @@ weasel_clear_scope()
 
 cat("guide semantics OK: displayed pattern equals extracted pattern;",
     "titles label the filtered column correctly\n")
+
+assert <- function(ok, ...) {
+  if (!isTRUE(ok)) fail(...)
+}
+
+# extract the actual template literals through JavaScript, as the
+# snippet workflow does; no text parser or extra R dependency is needed
+snippet_dir <- tempfile("weasel_guide_semantics_")
+dir.create(snippet_dir)
+node <- Sys.which("node")
+assert(nzchar(node), "Node.js is required to extract the guide recipes")
+extract_script <- paste(
+  'const fs = require("fs"), vm = require("vm");',
+  'const src = fs.readFileSync("docs/app.js", "utf8");',
+  'vm.runInNewContext(src + "\\n;__out(TREE);", {',
+  '  document: { addEventListener() {} },',
+  '  __out(tree) {',
+  '    for (const [key, node] of Object.entries(tree)) {',
+  '      if (node && node.code) {',
+  '        fs.writeFileSync(process.argv[1] + "/" + key + ".R", node.code);',
+  '      }',
+  '    }',
+  '  }',
+  '});',
+  sep = "\n"
+)
+status <- system2(node, c("-e", shQuote(extract_script), shQuote(snippet_dir)))
+assert(identical(status, 0L), "could not extract guide snippets")
+assert(length(list.files(snippet_dir, pattern = "\\.R$")) == 9L,
+       "expected nine guide snippets")
+
+# run the copied recipe, recording calls and returned tables without
+# replacing package behavior. only the explicit opt-in covariate
+# assignment is changed when exercising the optional diagnostic
+run_recipe <- function(recipe, data, diagnostic_vars = NULL) {
+  expressions <- parse(file.path(snippet_dir, paste0(recipe, ".R")))
+  if (!is.null(diagnostic_vars)) {
+    assignment <- vapply(expressions, function(x) {
+      is.call(x) && identical(x[[1]], as.name("<-")) &&
+        identical(x[[2]], as.name("diagnostic_vars"))
+    }, logical(1))
+    assert(sum(assignment) == 1L,
+           recipe, "must have one explicit diagnostic_vars assignment")
+    expressions[[which(assignment)]][[3]] <- diagnostic_vars
+  }
+  env <- new.env(parent = globalenv())
+  env$your_data <- data
+  trace <- new.env(parent = emptyenv())
+  trace$calls <- list()
+  for (api_name in c("weasel_summarize_subset", "weasel_apply",
+                     "weasel_justify_subset", "weasel_selectivity",
+                     "weasel_print_table")) {
+    env[[api_name]] <- local({
+      name <- api_name
+      function(...) {
+        args <- list(...)
+        index <- length(trace$calls) + 1L
+        trace$calls[[index]] <- list(name = name, args = args)
+        result <- do.call(getExportedValue("weasel", name), args)
+        trace$calls[[index]]$result <- result
+        result
+      }
+    })
+  }
+  error <- NULL
+  output <- capture.output(tryCatch(eval(expressions, envir = env),
+    error = function(e) error <<- e))
+  list(env = env, calls = trace$calls, error = error, output = output)
+}
+
+calls_named <- function(run, name) {
+  Filter(function(x) identical(x$name, name), run$calls)
+}
+selection_calls <- function(run) {
+  Filter(function(x) x$name != "weasel_print_table", run$calls)
+}
+
+# the balanced scenario wins here, but strict retains only two people:
+# a hard-coded strict diagnostic would compare a different sample
+panel <- do.call(rbind, lapply(1:25, function(i) {
+  times <- if (i <= 2) 1:6 else if (i <= 20) c(1, 2, 4, 5, 6) else 2:5
+  data.frame(id = i, time = times, x = 10 * i + times)
+}))
+plan_recipes <- c("result_plan_core", "result_plan_full",
+                  "result_plan_justify_core", "result_plan_justify_full")
+for (recipe in plan_recipes) {
+  run <- run_recipe(recipe, panel)
+  assert(is.null(run$error), recipe, "failed on the balanced fixture")
+  assert(identical(run$env$chosen_scenario, "anchored_balanced"),
+         recipe, "did not choose the nonempty recommended scenario")
+  assert(setequal(unique(run$env$analysis_data$id), 1:20),
+         recipe, "extracted the wrong respondents")
+  assert(all(vapply(selection_calls(run), function(x) {
+    identical(x$args[[2]], run$env$chosen_scenario)
+  }, logical(1))), recipe, "used inconsistent scenarios")
+}
+core <- run_recipe("result_plan_core", panel, diagnostic_vars = "x")
+assert(is.null(core$error), "core recipe rejected an eligible covariate")
+diagnostics <- calls_named(core, "weasel_selectivity")
+assert(length(diagnostics) == 1L, "core recipe did not run the opted-in diagnostic")
+diagnostic <- diagnostics[[1]]
+assert(identical(diagnostic$args[[2]], core$env$chosen_scenario),
+       "diagnostic used a different scenario from extraction")
+assert(identical(diagnostic$result$n_retained, 20L) &&
+         identical(diagnostic$result$n_excluded, 5L),
+       "diagnostic must compare the 20 selected and 5 excluded respondents")
+assert(identical(core$env$s$headline$scenario, core$env$chosen_scenario) &&
+         core$env$s$headline$n_ids == 20L,
+       "summary does not describe the extracted scenario")
+covariates <- panel
+covariates$flag <- covariates$id %% 2L == 0L
+covariates$sparse_x <- ifelse(covariates$id %in% 2:20, NA_real_, covariates$x)
+covariates$constant <- 1
+covariate_run <- run_recipe("result_plan_core", covariates,
+  diagnostic_vars = c("flag", "sparse_x", "constant"))
+assert(is.null(covariate_run$error), "core recipe rejected eligible covariates")
+covariate_result <- calls_named(covariate_run, "weasel_selectivity")[[1]]$result
+logical_result <- covariate_result[covariate_result$variable == "flag", ]
+sparse_result <- covariate_result[covariate_result$variable == "sparse_x", ]
+constant_result <- covariate_result[covariate_result$variable == "constant", ]
+assert(logical_result$n_retained == 20L && logical_result$n_excluded == 5L &&
+         is.finite(logical_result$smd), "logical covariate diagnostic is incomplete")
+assert(sparse_result$n_retained == 1L && sparse_result$n_excluded == 5L &&
+         is.na(sparse_result$smd) && is.na(constant_result$smd),
+       "per-covariate missingness/variance prerequisites are not represented")
+invalid_covariates <- panel
+invalid_covariates$label <- as.character(invalid_covariates$id)
+for (variable in c("not_in_data", "label", "id", "time")) {
+  invalid <- run_recipe("result_plan_core", invalid_covariates,
+                        diagnostic_vars = variable)
+  assert(inherits(invalid$error, "error") &&
+           grepl("Choose numeric/logical covariates", conditionMessage(invalid$error),
+                 fixed = TRUE) &&
+           length(calls_named(invalid, "weasel_selectivity")) == 0L,
+         "core recipe did not reject ineligible diagnostic variable:", variable)
+}
+observed <- table(table(core$env$analysis_data$id))
+assert(identical(as.integer(observed[c("5", "6")]), c(18L, 2L)),
+       "balanced fixed-window fixture must include incomplete observations")
+strict <- weasel_apply(core$env$p, "anchored_strict")
+assert(length(unique(strict$id)) == 2L && all(table(strict$id) == 6L),
+       "strict fixture does not demonstrate complete participation")
+
+# the displayed sensitivity table must contain all three tolerances,
+# holding the other settings fixed for an interpretable one-factor sweep
+for (recipe in c("result_plan_core", "result_plan_full")) {
+  run <- run_recipe(recipe, panel)
+  sweeps <- Filter(function(x) {
+    is.data.frame(x$result) && "max_missing" %in% names(x$result) &&
+      "prop_ids" %in% names(x$result)
+  }, calls_named(run, "weasel_print_table"))
+  assert(length(sweeps) == 1L, recipe, "did not display one sensitivity table")
+  displayed <- sweeps[[1]]$result
+  assert(nrow(displayed) == 3L &&
+           identical(as.integer(displayed$max_missing), 0:2) &&
+           length(unique(displayed$require_endpoints)) == 1L &&
+           length(unique(displayed$n_gap_max)) == 1L &&
+           length(unique(displayed$max_gap_len)) == 1L,
+         recipe, "truncated or confounded the missing-wave sweep")
+  assert(identical(as.integer(displayed$n_ids), c(2L, 20L, 20L)),
+         recipe, "sensitivity display lost the fixture's tolerance effect")
+}
+
+# no default scenario retains anyone; fail deliberately before any
+# summary, extraction or methods paragraph can imply a selected sample
+sparse <- rbind(expand.grid(id = 1:5, time = 1:3),
+                expand.grid(id = 6:10, time = 4:6))
+for (recipe in plan_recipes) {
+  run <- run_recipe(recipe, sparse)
+  assert(inherits(run$error, "error"), recipe, "did not stop an empty recommendation")
+  assert(grepl("recommend", conditionMessage(run$error), ignore.case = TRUE) &&
+           !grepl("scenario not found", conditionMessage(run$error), fixed = TRUE),
+         recipe, "did not explain the absent recommendation")
+  assert(length(selection_calls(run)) == 0L,
+         recipe, "called selection APIs before resolving an empty recommendation")
+  assert(!exists("analysis_data", envir = run$env, inherits = FALSE),
+         recipe, "created analysis data without a chosen scenario")
+}
+
+# an id/time-only panel still supports selection; covariate diagnostics
+# are optional, and all-retained data have no excluded group to compare
+no_covariates <- run_recipe("result_plan_core", panel[c("id", "time")])
+assert(is.null(no_covariates$error) &&
+         length(calls_named(no_covariates, "weasel_selectivity")) == 0L &&
+         setequal(unique(no_covariates$env$analysis_data$id), 1:20),
+       "id/time-only core recipe did not skip optional selectivity safely")
+complete <- expand.grid(id = 1:5, time = 1:6)
+complete$x <- complete$id
+all_retained <- run_recipe("result_plan_core", complete, diagnostic_vars = "x")
+assert(is.null(all_retained$error) &&
+         length(calls_named(all_retained, "weasel_selectivity")) == 0L &&
+         setequal(unique(all_retained$env$analysis_data$id), 1:5),
+       "all-retained core recipe did not skip selectivity safely")
+all_retained_error <- tryCatch(
+  weasel_selectivity(all_retained$env$p, all_retained$env$chosen_scenario,
+                    vars = "x"), error = identity)
+assert(inherits(all_retained_error, "error") &&
+         grepl("no excluded group", conditionMessage(all_retained_error), fixed = TRUE),
+       "all-retained prerequisite claim does not match the actual API")
+
+# min_present is a Scope constraint. for a fixed grid, Plan can express
+# the same observation threshold with L - required observations. the
+# observed-grid case prevents confusing L with the numeric bounds width
+for (grid in c("consecutive", "observed")) {
+  data <- panel
+  if (grid == "observed") data$time <- 2000L + 2L * (data$time - 1L)
+  for (required in c(3L, 5L, 6L)) {
+    scenarios <- data.frame(
+      scenario = "minimum_observations", require_endpoints = FALSE,
+      max_missing = 6L - required, n_gap_max = Inf, max_gap_len = Inf
+    )
+    plan <- weasel_plan(data, "id", "time", span = "full", grid = grid,
+                        scenarios = scenarios)
+    L <- length(plan$span)
+    assert(L == 6L && scenarios$max_missing == L - required,
+           "observation equivalence fixture has the wrong grid length")
+    set_weasel_scope(data, "id", "time", grid = grid,
+                     lower = plan$lower, upper = plan$upper,
+                     min_present = required)
+    wide <- weasel_reshape_to_wide()
+    selected <- weasel_apply(plan, "minimum_observations")
+    assert(setequal(wide$id, selected$id), grid, "Scope/Plan threshold mismatch")
+    weasel_clear_scope()
+  }
+}
+ignored_minimum <- data.frame(
+  scenario = "unsupported_minimum", require_endpoints = FALSE,
+  min_present = 6L, max_missing = Inf, n_gap_max = Inf, max_gap_len = Inf
+)
+minimum_panel <- data.frame(id = c(rep("complete", 6), rep("partial", 3)),
+                            time = c(1:6, 2:4))
+ignored_plan <- weasel_plan(minimum_panel, "id", "time", span = "full",
+                            scenarios = ignored_minimum)
+assert(!("min_present" %in% names(ignored_plan$plan)) &&
+         setequal(weasel_apply(ignored_plan, "unsupported_minimum")$id,
+                  c("complete", "partial")),
+       "Scope-only min_present claim no longer matches the Plan API")
+supported_minimum <- ignored_minimum[setdiff(names(ignored_minimum), "min_present")]
+supported_minimum$scenario <- "six_observations"
+supported_minimum$max_missing <- 0L
+supported_plan <- weasel_plan(minimum_panel, "id", "time", span = "full",
+                              scenarios = supported_minimum)
+assert(identical(unique(weasel_apply(supported_plan, "six_observations")$id),
+                 "complete"),
+       "supported zero-missing constraint retained a three-wave respondent")
+
+unlink(snippet_dir, recursive = TRUE)
+cat("guide semantics OK: scenario consistency, fixed-window completeness,",
+    "empty/optional diagnostic guards, full sensitivity display, and",
+    "Scope/Plan observation equivalence\n")
