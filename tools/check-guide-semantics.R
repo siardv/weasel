@@ -94,22 +94,26 @@ extract_script <- paste(
 )
 status <- system2(node, c("-e", shQuote(extract_script), shQuote(snippet_dir)))
 assert(identical(status, 0L), "could not extract guide snippets")
-assert(length(list.files(snippet_dir, pattern = "\\.R$")) == 9L,
-       "expected nine guide snippets")
+assert(length(list.files(snippet_dir, pattern = "\\.R$")) == 10L,
+       "expected ten guide snippets")
 
 # run the copied recipe, recording calls and returned tables without
-# replacing package behavior. only the explicit opt-in covariate
-# assignment is changed when exercising the optional diagnostic
-run_recipe <- function(recipe, data, diagnostic_vars = NULL) {
+# replacing package behavior. only explicit reader choices are changed
+# when exercising a different grid, covariate or named scenario
+run_recipe <- function(recipe, data, diagnostic_vars = NULL,
+                       wave_grid = NULL, chosen_scenario = NULL) {
   expressions <- parse(file.path(snippet_dir, paste0(recipe, ".R")))
-  if (!is.null(diagnostic_vars)) {
+  choices <- list(diagnostic_vars = diagnostic_vars, wave_grid = wave_grid,
+                  chosen_scenario = chosen_scenario)
+  for (choice in names(choices)) {
+    if (is.null(choices[[choice]])) next
     assignment <- vapply(expressions, function(x) {
       is.call(x) && identical(x[[1]], as.name("<-")) &&
-        identical(x[[2]], as.name("diagnostic_vars"))
+        identical(x[[2]], as.name(choice))
     }, logical(1))
     assert(sum(assignment) == 1L,
-           recipe, "must have one explicit diagnostic_vars assignment")
-    expressions[[which(assignment)]][[3]] <- diagnostic_vars
+           recipe, "must have one explicit", choice, "assignment")
+    expressions[[which(assignment)]][[3]] <- choices[[choice]]
   }
   env <- new.env(parent = globalenv())
   env$your_data <- data
@@ -117,7 +121,9 @@ run_recipe <- function(recipe, data, diagnostic_vars = NULL) {
   trace$calls <- list()
   for (api_name in c("weasel_summarize_subset", "weasel_apply",
                      "weasel_justify_subset", "weasel_selectivity",
-                     "weasel_print_table")) {
+                     "weasel_print_table", "weasel_plan", "set_weasel_scope",
+                     "evaluate_weasel_scope", "weasel_scope_info",
+                     "weasel_reshape_to_wide", "weasel_get_data_by_row")) {
     env[[api_name]] <- local({
       name <- api_name
       function(...) {
@@ -130,17 +136,30 @@ run_recipe <- function(recipe, data, diagnostic_vars = NULL) {
       }
     })
   }
+  env$print <- function(...) {
+    args <- list(...)
+    trace$calls[[length(trace$calls) + 1L]] <- list(name = "print", args = args)
+    base::print(...)
+  }
   error <- NULL
-  output <- capture.output(tryCatch(eval(expressions, envir = env),
-    error = function(e) error <<- e))
-  list(env = env, calls = trace$calls, error = error, output = output)
+  warnings <- list()
+  output <- capture.output(withCallingHandlers(
+    tryCatch(eval(expressions, envir = env), error = function(e) error <<- e),
+    warning = function(w) {
+      warnings[[length(warnings) + 1L]] <<- w
+      invokeRestart("muffleWarning")
+    }
+  ))
+  list(env = env, calls = trace$calls, error = error, warnings = warnings,
+       output = output)
 }
 
 calls_named <- function(run, name) {
   Filter(function(x) identical(x$name, name), run$calls)
 }
 selection_calls <- function(run) {
-  Filter(function(x) x$name != "weasel_print_table", run$calls)
+  Filter(function(x) x$name %in% c("weasel_summarize_subset", "weasel_apply",
+    "weasel_justify_subset", "weasel_selectivity"), run$calls)
 }
 
 # the balanced scenario wins here, but strict retains only two people:
@@ -312,7 +331,168 @@ assert(identical(unique(weasel_apply(supported_plan, "six_observations")$id),
                  "complete"),
        "supported zero-missing constraint retained a three-wave respondent")
 
+# audit the actual recipe call and printed span, including their order:
+# the declared choice must reach the API, and the resolved grid must be
+# visible before selection. bounds alone cannot reveal an observed grid
+assert_grid_audit <- function(run, recipe, grid, expected_span) {
+  assert(is.null(run$error), recipe, "failed with grid", grid)
+  plans <- calls_named(run, "weasel_plan")
+  setups <- if (length(plans)) plans else calls_named(run, "set_weasel_scope")
+  assert(length(setups) == 1L && identical(setups[[1]]$args$grid, grid),
+         recipe, "did not pass its explicit grid choice to the API")
+  if (length(plans)) {
+    span <- plans[[1]]$result$span
+  } else {
+    info <- calls_named(run, "weasel_scope_info")
+    assert(length(info) == 1L, recipe, "did not inspect the resolved Scope span")
+    span <- info[[1]]$result$span
+  }
+  assert(identical(as.numeric(span), as.numeric(expected_span)),
+         recipe, "resolved the wrong span for grid", grid)
+  displayed <- which(vapply(run$calls, function(x) {
+    identical(x$name, "print") && length(x$args) >= 1L &&
+      is.numeric(x$args[[1]]) && is.null(dim(x$args[[1]])) &&
+      identical(as.numeric(x$args[[1]]), as.numeric(span))
+  }, logical(1)))
+  selection <- which(vapply(run$calls, function(x) {
+    x$name %in% c("weasel_reshape_to_wide", "weasel_summarize_subset",
+                  "weasel_apply", "weasel_justify_subset")
+  }, logical(1)))
+  assert(length(displayed) == 1L && length(selection) > 0L &&
+           displayed < min(selection),
+         recipe, "did not print the actual span before selection")
+}
+
+scope_recipes <- c("result_scope_full", "result_scope_bounded")
+real_recipes <- c(scope_recipes, plan_recipes, "result_plan_custom")
+grid_panel <- expand.grid(id = 1:5, time = c(1L, 2L, 4L, 5L, 6L))
+for (recipe in real_recipes) {
+  default <- run_recipe(recipe, grid_panel)
+  expected <- if (recipe == "result_scope_bounded") 1:10 else 1:6
+  assert(identical(default$env$wave_grid, "consecutive"),
+         recipe, "did not declare the illustrated consecutive grid")
+  assert_grid_audit(default, recipe, "consecutive", expected)
+  observed <- run_recipe(recipe, grid_panel, wave_grid = "observed")
+  assert_grid_audit(observed, recipe, "observed", c(1L, 2L, 4L, 5L, 6L))
+  weasel_clear_scope()
+}
+
+# biennial labels are not annual scheduling indices: two artificial
+# missing years empty the strict/balanced presets, while the lenient
+# preset can still retain people. observed resolves three actual waves
+biennial <- expand.grid(id = 1:5, time = c(2008L, 2010L, 2012L))
+presets <- c("anchored_strict", "anchored_balanced", "lenient_info_max")
+for (recipe in plan_recipes) {
+  annual <- run_recipe(recipe, biennial)
+  assert_grid_audit(annual, recipe, "consecutive", 2008:2012)
+  counts <- annual$env$p$plan$n_ids[match(presets, annual$env$p$plan$scenario)]
+  assert(all(counts == c(0L, 0L, 5L)) &&
+           identical(annual$env$chosen_scenario, "lenient_info_max") &&
+           any(vapply(annual$warnings, inherits, logical(1), "weasel_empty_waves")),
+         recipe, "did not expose the biennial consecutive-grid consequence")
+  scheduled <- run_recipe(recipe, biennial, wave_grid = "observed")
+  assert_grid_audit(scheduled, recipe, "observed", c(2008L, 2010L, 2012L))
+  counts <- scheduled$env$p$plan$n_ids[
+    match(presets, scheduled$env$p$plan$scenario)]
+  assert(all(counts == 5L) &&
+           setequal(unique(scheduled$env$analysis_data$id), 1:5),
+         recipe, "did not retain the complete biennial panel on its observed grid")
+}
+
+# observed inference cannot recover a wave absent from everyone's data.
+# a saved complete schedule lookup can instead supply deliberate indices
+schedule <- data.frame(year = c(2008L, 2010L, 2012L, 2014L), time = 1:4)
+absent_wave <- expand.grid(id = 1:5, year = c(2008L, 2012L, 2014L))
+absent_wave$time <- schedule$time[match(absent_wave$year, schedule$year)]
+assert(identical(sort(unique(absent_wave$time)), c(1L, 3L, 4L)) &&
+         nrow(absent_wave) == 15L,
+       "complete-schedule mapping added placeholder rows or compressed the missing wave")
+inferred <- run_recipe("result_plan_full", absent_wave, wave_grid = "observed")
+assert_grid_audit(inferred, "result_plan_full", "observed", c(1L, 3L, 4L))
+strict_row <- match("anchored_strict", inferred$env$p$plan$scenario)
+assert(inferred$env$p$plan$n_ids[strict_row] == 5L,
+       "observed inference did not omit the globally absent scheduled wave")
+scheduled <- run_recipe("result_plan_full", absent_wave)
+assert_grid_audit(scheduled, "result_plan_full", "consecutive", 1:4)
+strict_row <- match("anchored_strict", scheduled$env$p$plan$scenario)
+assert(scheduled$env$p$plan$n_ids[strict_row] == 0L,
+       "consecutive scheduling did not count the globally absent wave")
+bounded_schedule <- suppressWarnings(weasel_plan(absent_wave, "id", "time",
+  lower = 1L, upper = 4L, grid = "consecutive"))
+assert(identical(bounded_schedule$span, 1:4) &&
+         nrow(weasel_apply(bounded_schedule, "anchored_strict")) == 0L,
+       "explicit bounds on complete-schedule indices did not preserve the absent wave")
+
+# a row with an NA outcome is participation. no row is different, and
+# neither grid selection nor custom criteria redefine item eligibility
+custom_panel <- data.frame(
+  id = c(rep("complete", 3), rep("one_missing", 2), rep("no_first", 2)),
+  time = c(1:3, 1L, 3L, 2L, 3L),
+  outcome = c(1, NA, 1, 1, 1, 1, 1)
+)
+custom <- run_recipe("result_plan_custom", custom_panel)
+assert_grid_audit(custom, "result_plan_custom", "consecutive", 1:3)
+criteria <- custom$env$criteria
+assert(identical(names(criteria), c("scenario", "require_endpoints", "max_missing",
+                                    "n_gap_max", "max_gap_len")) &&
+         identical(criteria$scenario, c("custom_complete", "custom_one_missing")),
+       "custom recipe does not pass the five supported fields and named alternatives")
+custom_counts <- custom$env$p$plan$n_ids[
+  match(criteria$scenario, custom$env$p$plan$scenario)]
+assert(all(custom_counts == c(1L, 2L)) &&
+         identical(custom$env$chosen_scenario, "custom_one_missing") &&
+         setequal(unique(custom$env$analysis_data$id), c("complete", "one_missing")),
+       "custom recipe did not extract its deliberately chosen named scenario")
+assert(anyNA(custom$env$analysis_data$outcome) &&
+         identical(unique(weasel_apply(custom$env$p, "custom_complete")$id),
+                   "complete"),
+       "custom recipe confused NA item values with absent participation rows")
+assert(length(selection_calls(custom)) >= 3L &&
+         all(vapply(selection_calls(custom), function(x) {
+           identical(x$args[[2]], custom$env$chosen_scenario)
+         }, logical(1))),
+       "custom summary, extraction and methods text used different scenarios")
+
+# the same structural rules also operate in one active Scope. compare
+# respondent IDs rather than rendered counts or row order
+chosen <- criteria[match(custom$env$chosen_scenario, criteria$scenario), ]
+set_weasel_scope(custom_panel, "id", "time", grid = custom$env$wave_grid,
+  lower = custom$env$p$lower, upper = custom$env$p$upper,
+  require_endpoints = chosen$require_endpoints, max_missing = chosen$max_missing,
+  n_gap_max = chosen$n_gap_max, max_gap_len = chosen$max_gap_len)
+custom_scope <- weasel_reshape_to_wide()
+assert(setequal(custom_scope$id, custom$env$analysis_data$id),
+       "equivalent custom Scope and Plan constraints retained different respondents")
+weasel_clear_scope()
+
+for (choice in list(character(0), NA_character_, "not_a_scenario",
+                     c("custom_one_missing", "custom_one_missing"))) {
+  invalid <- run_recipe("result_plan_custom", custom_panel, chosen_scenario = choice)
+  assert(inherits(invalid$error, "error") && length(selection_calls(invalid)) == 0L &&
+           !exists("analysis_data", envir = invalid$env, inherits = FALSE),
+         "custom recipe did not reject an invalid named choice before selection")
+}
+empty_custom <- run_recipe("result_plan_custom", sparse)
+assert(inherits(empty_custom$error, "error") &&
+         length(selection_calls(empty_custom)) == 0L &&
+         !exists("analysis_data", envir = empty_custom$env, inherits = FALSE),
+       "custom recipe did not stop an empty named scenario before selection")
+
+# readiness is an API prerequisite, not an implicit coercion in a recipe
+for (waves in list(as.character(1:3), factor(1:3), c(1, 1.5, 3), c(1, 2, Inf))) {
+  invalid_panel <- data.frame(id = 1L, time = waves)
+  for (recipe in c("result_scope_full", "result_plan_full")) {
+    invalid <- run_recipe(recipe, invalid_panel)
+    assert(inherits(invalid$error, "error") &&
+             length(selection_calls(invalid)) == 0L &&
+             length(calls_named(invalid, "weasel_reshape_to_wide")) == 0L,
+           recipe, "did not reject unsupported wave coding before selection")
+  }
+}
+
 unlink(snippet_dir, recursive = TRUE)
 cat("guide semantics OK: scenario consistency, fixed-window completeness,",
     "empty/optional diagnostic guards, full sensitivity display, and",
     "Scope/Plan observation equivalence\n")
+cat("guide semantics OK: explicit grid and span audits, biennial/absent-wave",
+    "counterexamples, row-presence participation, and custom named criteria\n")

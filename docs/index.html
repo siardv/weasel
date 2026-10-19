@@ -80,6 +80,15 @@
           Which workflow do you need? Answer one question at a time to reach the right recipe.
           The address bar follows along, so any step or recipe can be shared as a direct link.
         </p>
+        <div aria-labelledby="data-readiness">
+          <h2 class="ov-heading" id="data-readiness">Before using your data</h2>
+          <ul class="ov-list">
+            <li>Use long data with a respondent identifier and a numeric, integer-valued wave column. The automatic core/full Plan recipes need at least three distinct recorded waves. Map labels or dates to scheduled-wave indices first, preserving a lookup.</li>
+            <li>Participation means a valid (id, wave) row exists. An absent row is a missed wave; a row with missing outcomes still counts as observed. Do not add <code>NA</code> placeholder rows for missed waves.</li>
+            <li>Choose the grid from the study schedule: <code>"consecutive"</code> counts every integer in the window; <code>"observed"</code> counts only distinct wave values recorded in the data. Year labels alone do not determine the correct choice.</li>
+            <li>An observed grid cannot recover a scheduled wave absent from every record. For a known non-consecutive schedule with such absences, map the full schedule to sequential integer indices, retain the lookup, and use <code>"consecutive"</code> with explicit bounds. Inspect the printed span in each recipe before selection.</li>
+          </ul>
+        </div>
       </div>
     </div>
   </section>
@@ -114,11 +123,11 @@
           <div class="pipeline-list">
             <div class="pip-row">
               <span class="pip-tag pip-scope">Scope</span>
-              <span class="pip-desc"><strong>Exploratory.</strong> Map the missingness landscape before committing to any selection rule.</span>
+              <span class="pip-desc"><strong>Exploratory.</strong> Map participation and extract respondents under one configuration, including structural constraints.</span>
             </div>
             <div class="pip-row">
               <span class="pip-tag pip-plan">Plan</span>
-              <span class="pip-desc"><strong>Comparative.</strong> Enforce explicit constraints, score trade-offs, and extract a reproducible sample.</span>
+              <span class="pip-desc"><strong>Comparative.</strong> Compare and record named constraint alternatives, score trade-offs, and extract a reproducible sample.</span>
             </div>
           </div>
         </div>
@@ -311,7 +320,7 @@
           <h2 class="ov-heading">Key definitions</h2>
           <ul class="ov-list">
             <li><strong>Observed wave</strong>: a row for that (id, wave) pair exists in the long data; a missed wave is an absent row.</li>
-            <li><strong>Span and grid</strong>: the analysis window and its scheduled waves; <code>grid = "observed"</code> uses only waves that occur in the data (biennial panels, waves recorded as years).</li>
+            <li><strong>Span and grid</strong>: the analysis window and its scheduled waves; <code>grid = "observed"</code> uses only waves that occur in the data. Use it when those recorded values represent the intended schedule; an entirely absent scheduled wave cannot be inferred.</li>
             <li><strong>Endpoints</strong>: observed at the first and last wave of the span. <code>.. 3 4 5 ..</code> misses both endpoints yet has no interior gap.</li>
             <li><strong>Interior gap</strong>: a run of missing waves strictly between a respondent's first and last observed wave. <code>1 2 .. 5 6 7</code> has one gap of length 2; <code>1 . 3 . 5 . 7</code> has three gaps of length 1; late entry and early exit are not gaps.</li>
             <li><strong>Constraints</strong>: Scope supports <code>min_present</code>, <code>max_missing</code>, <code>n_gap_max</code>, <code>max_gap_len</code>, and <code>require_endpoints</code>. <code>min_present</code> is Scope-only. Plan scenario tables use exactly five fields: <code>scenario</code> (the name), <code>require_endpoints</code>, <code>max_missing</code>, <code>n_gap_max</code>, and <code>max_gap_len</code>. On a fixed grid of length L, at least M observed waves (integer M, 1 &le; M &le; L) is equivalent to <code>max_missing = L - M</code>, with other constraints held equal. L counts grid waves, for example <code>length(p$span)</code>, and need not equal <code>upper - lower + 1</code> on an observed grid.</li>

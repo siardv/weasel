@@ -1,5 +1,11 @@
 /* weasel decision guide: tree data + ui controller */
 
+const REAL_DATA_GUIDANCE =
+  'Before running this recipe, set `wave_grid` deliberately: use `"consecutive"` ' +
+  'when every integer in the window is scheduled, or `"observed"` when the distinct ' +
+  'recorded wave values represent the intended schedule. An entirely absent scheduled ' +
+  'wave is lost from an observed grid. Inspect the printed span before selection. ';
+
 const TREE = {
   start: {
     type: "question",
@@ -8,7 +14,8 @@ const TREE = {
       "Do you have your own longitudinal panel data ready to work with?",
     explanation:
       "Both pipelines expect a long-format data frame (one row per respondent per wave) " +
-      "with a respondent identifier column and a wave or time column. " +
+      "with a respondent identifier column and a numeric, integer-valued wave column. " +
+      "Review the data-readiness guidance above and choose the scheduled grid before copying a recipe. " +
       "A wave is treated as observed when a row for that respondent and wave exists; " +
       "a missed wave is simply an absent row, which is how real panel files usually arrive. " +
       "If you do not have real data yet, weasel can generate a synthetic panel so you can " +
@@ -23,16 +30,15 @@ const TREE = {
     question:
       "Do you want to explore participation patterns before deciding on a selection rule?",
     explanation:
-      "The Scope pipeline maps which respondents were observed at which waves and groups " +
-      "them into participation fingerprints. This is useful when you do not yet have a " +
-      "clear selection rule in mind and want to understand the missingness landscape first. " +
-      "If you already know the structural criteria you want to apply (required endpoints, " +
-      "a missingness tolerance, a gap limit), go directly to the Plan pipeline, which is " +
-      "the pipeline that actually enforces those constraints.",
+      "Scope maps participation fingerprints and extracts respondents under one active " +
+      "configuration. It also enforces structural constraints such as endpoint, missing-wave " +
+      "and interior-gap requirements. Plan compares and records named alternatives under " +
+      "those constraints. Use Scope to inspect patterns under one configuration, or Plan " +
+      "to compare alternative rules. Both pipelines can enforce selection criteria.",
     yes: { label: "Yes, I want to map patterns first", next: "scope_range" },
     no: {
-      label: "No, I want to construct a sample directly",
-      next: "plan_doc",
+      label: "No, I want to compare selection rules",
+      next: "plan_criteria",
     },
   },
 
@@ -88,6 +94,21 @@ const TREE = {
     },
   },
 
+  plan_criteria: {
+    type: "question",
+    shortLabel: "Selection criteria",
+    question: "Do you want to enter your own named selection criteria?",
+    explanation:
+      "Plan accepts a table of named alternatives with endpoint, missing-wave and interior-gap " +
+      "requirements. The three built-in presets are examples to review against your study " +
+      "design, not rules that every analysis should adopt. If you already have criteria, " +
+      "use the custom-table recipe; if you want to inspect the built-in examples first, " +
+      "continue to the preset recipes. For one active configuration, Scope also enforces " +
+      "structural constraints without comparing alternatives.",
+    yes: { label: "Yes, show a custom-criteria table", next: "result_plan_custom" },
+    no: { label: "No, compare the built-in examples first", next: "plan_doc" },
+  },
+
   plan_doc: {
     type: "question",
     shortLabel: "Methods documentation",
@@ -112,7 +133,7 @@ const TREE = {
     question:
       "Do you want a common fixed-length analysis window?",
     explanation:
-      "`span = \"core\"` asks weasel to locate the highest-coverage consecutive window of " +
+      "`span = \"core\"` asks weasel to locate the highest-coverage window of consecutive grid waves of " +
       "a specified length (`core_len`, default 6). A common window does not mean every " +
       "respondent is observed at every wave: balanced and lenient scenarios allow missing " +
       "waves. Complete participation requires `max_missing = 0`, as in `anchored_strict`. " +
@@ -135,7 +156,7 @@ const TREE = {
     shortLabel: "Common analysis window",
     question: "Do you want a common fixed-length analysis window?",
     explanation:
-      "`span = \"core\"` selects the densest consecutive window of fixed length. " +
+      "`span = \"core\"` selects the densest window of a fixed number of consecutive grid waves. " +
       "Every selected respondent shares that window, but balanced and lenient scenarios " +
       "allow missing waves within it. Complete participation requires `max_missing = 0`, " +
       "as in `anchored_strict`; row presence does not ensure non-missing outcomes. " +
@@ -157,19 +178,23 @@ const TREE = {
     pipeline: "Scope Pipeline",
     badgeClass: "badge-scope",
     heading: "Scope pipeline: full wave range",
-    summary:
+    summary: REAL_DATA_GUIDANCE +
       "Explore all waves without restriction. The presence matrix covers the complete " +
       "observed range, giving an unfiltered view of participation patterns across every " +
       "wave in your panel. This is the appropriate starting point when you have no " +
       "prior knowledge of where missingness is concentrated.",
     steps: [
       {
-        fn: 'set_weasel_scope(data, "id", "time")',
+        fn: 'set_weasel_scope(data, "id", "time", grid = wave_grid)',
         note: "initialise the scope environment; no bounds means weasel uses the full observed range",
       },
       {
         fn: "evaluate_weasel_scope()",
         note: "resolve lower and upper bounds from the data; inspect them before pivoting if needed",
+      },
+      {
+        fn: "weasel_scope_info()$span",
+        note: "inspect the actual scheduled wave vector before reshaping or selection",
       },
       {
         fn: "weasel_reshape_to_wide()",
@@ -192,8 +217,12 @@ const TREE = {
 
 d <- your_data  # long-format: id, time, var1 ...
 
-set_weasel_scope(d, "id", "time")
+# choose from the study schedule; use "observed" only when it represents that schedule
+wave_grid <- "consecutive"
+
+set_weasel_scope(d, "id", "time", grid = wave_grid)
 evaluate_weasel_scope()
+print(weasel_scope_info()$span)
 weasel_reshape_to_wide()
 weasel_summarize_waves()
 
@@ -219,19 +248,23 @@ head(subset1)`,
     pipeline: "Scope Pipeline",
     badgeClass: "badge-scope",
     heading: "Scope pipeline: bounded wave range",
-    summary:
+    summary: REAL_DATA_GUIDANCE +
       "Focus on a specific wave window. Bounding the range with `upper` (and optionally `lower`) " +
       "keeps the pattern table interpretable and removes sparse early or late waves. " +
       "Respondents who skip waves within the window are retained; their gaps show up as " +
       "distinct fingerprints (the '.' marks) rather than being filtered out.",
     steps: [
       {
-        fn: 'set_weasel_scope(data, "id", "time", upper = N)',
+        fn: 'set_weasel_scope(data, "id", "time", upper = N, grid = wave_grid)',
         note: "restrict to waves 1 through N; add `lower = M` for a non-zero start",
       },
       {
         fn: "evaluate_weasel_scope()",
         note: "finalise and validate the declared bounds",
+      },
+      {
+        fn: "weasel_scope_info()$span",
+        note: "inspect the actual scheduled wave vector before reshaping or selection",
       },
       { fn: "weasel_reshape_to_wide()", note: "build the restricted presence matrix" },
       {
@@ -251,8 +284,12 @@ head(subset1)`,
 
 d <- your_data
 
-set_weasel_scope(d, "id", "time", upper = 10)
+# choose from the study schedule; use "observed" only when it represents that schedule
+wave_grid <- "consecutive"
+
+set_weasel_scope(d, "id", "time", upper = 10, grid = wave_grid)
 evaluate_weasel_scope()
+print(weasel_scope_info()$span)
 weasel_reshape_to_wide()
 weasel_summarize_waves()
 
@@ -342,23 +379,114 @@ head(subset1)`,
       "`waves = seq(2008, 2020, 2)` and analyse with `grid = \"observed\"`.",
   },
 
+  result_plan_custom: {
+    type: "result",
+    pipeline: "Plan Pipeline",
+    badgeClass: "badge-plan",
+    heading: "Plan pipeline: custom selection criteria",
+    summary: REAL_DATA_GUIDANCE +
+      "Enter your design requirements as a table of named alternatives. This example " +
+      "compares complete participation with at most one missed interior wave, requiring " +
+      "both endpoints in each case. Replace these example tolerances with your own " +
+      "reviewed criteria. The example deliberately chooses `custom_one_missing`; the " +
+      "comparison score does not choose the study's inclusion rule for you.",
+    steps: [
+      {
+        fn: "criteria <- data.frame(scenario, require_endpoints, max_missing, n_gap_max, max_gap_len)",
+        note: "define named alternatives using the five supported Plan fields; review every example value",
+      },
+      {
+        fn: 'weasel_plan(data, "id", "time", span = "full", grid = wave_grid, scenarios = criteria)',
+        note: "evaluate your alternatives on the declared grid; use explicit bounds instead of span for a design-fixed window",
+      },
+      {
+        fn: "p$span",
+        note: "inspect the resolved scheduled waves before selection",
+      },
+      {
+        fn: "weasel_compare_scenarios(p)",
+        note: "inspect retained counts and trade-offs; the score is a comparison-relative heuristic",
+      },
+      {
+        fn: 'weasel_summarize_subset(p, chosen_scenario, data, "id", "time")',
+        note: "check that the deliberately chosen named rule retains respondents, then audit coverage",
+      },
+      {
+        fn: "weasel_apply(p, chosen_scenario)",
+        note: "extract exactly the sample described by the audit and methods paragraph",
+      },
+      {
+        fn: "weasel_justify_subset(p, chosen_scenario)",
+        note: "report the recorded constraints and selection; add your own rationale for choosing them",
+      },
+    ],
+    code: `library(weasel)
+
+d <- your_data
+
+# choose from the study schedule; use "observed" only when it represents that schedule
+wave_grid <- "consecutive"
+
+# example alternatives only: replace with your study's reviewed criteria
+criteria <- data.frame(
+  scenario = c("custom_complete", "custom_one_missing"),
+  require_endpoints = c(TRUE, TRUE),
+  max_missing = c(0L, 1L),
+  n_gap_max = c(0L, 1L),
+  max_gap_len = c(0L, 1L)
+)
+p <- weasel_plan(d, "id", "time", span = "full",
+  grid = wave_grid, scenarios = criteria)
+print(p$span)
+cmp <- weasel_compare_scenarios(p)
+weasel_print_table(cmp, title = "Custom scenario comparison")
+
+chosen_scenario <- "custom_one_missing"  # deliberate example choice; inspect cmp first
+chosen_row <- match(chosen_scenario, p$plan$scenario)
+if (length(chosen_scenario) != 1L || is.na(chosen_row) ||
+    p$plan$n_ids[chosen_row] == 0L) {
+  stop("The chosen custom scenario is absent or empty. Inspect cmp and deliberately revise the window or criteria before continuing.")
+}
+s <- weasel_summarize_subset(p, chosen_scenario, d, "id", "time")
+weasel_print_table(s$headline)
+weasel_print_table(s$per_wave_coverage, title = "Per-wave coverage")
+
+analysis_data <- weasel_apply(p, chosen_scenario)
+dim(analysis_data)
+cat(weasel_justify_subset(p, chosen_scenario), "\\n")`,
+    note:
+      "Plan uses exactly the five fields shown; `min_present` is Scope-only. On a fixed " +
+      "grid of length L, at least M observed waves is `max_missing = L - M` for integer " +
+      "1 <= M <= L, with other constraints unchanged. A `custom_one_missing` sample can " +
+      "contain incomplete respondents; complete participation requires `max_missing = 0`. " +
+      "These are row-presence requirements, not outcome-completeness requirements. " +
+      "Scope can enforce one such configuration too; Plan records the named alternatives " +
+      "for comparison. If your chosen rule retains nobody, the recipe stops before summary " +
+      "or extraction so you can revise it deliberately.",
+  },
+
   result_plan_core: {
     type: "result",
     pipeline: "Plan Pipeline",
     badgeClass: "badge-plan",
     heading: "Plan pipeline: core window",
-    summary:
-      "weasel locates the highest-coverage consecutive wave window of length `core_len` " +
+    summary: REAL_DATA_GUIDANCE +
+      "weasel locates the highest-coverage window of consecutive grid waves of length `core_len` " +
       "(default 6), then evaluates three built-in scenarios: `anchored_strict` (no missing " +
       "waves, both endpoints required), `anchored_balanced` (at most 1 missing, both endpoints), " +
       "and `lenient_info_max` (at most 2 missing, endpoints not required), scoring each on " +
-      "coverage, endpoint rate, and gap structure. Review the scored table and choose the " +
+      "coverage, endpoint rate, and gap structure. These presets are examples, not study-design " +
+      "requirements. Review the scored table and choose the " +
       "scenario that best fits your analytical requirements. A shared window does not " +
       "ensure complete participation: only the strict preset requires every wave.",
     steps: [
       {
-        fn: 'weasel_plan(data, "id", "time", span = "core")',
-        note: "build and score three scenarios over the highest-coverage consecutive window; returns a plan object",
+        fn: 'weasel_plan(data, "id", "time", span = "core", grid = wave_grid)',
+        note: "build and score three scenarios over the highest-coverage window of consecutive grid waves; returns a plan object",
+      },
+      {
+        fn: "p$span",
+        note: "inspect the resolved scheduled waves before comparing or selecting respondents",
       },
       {
         fn: "weasel_compare_scenarios(p)",
@@ -385,7 +513,11 @@ head(subset1)`,
 
 d <- your_data
 
-p   <- weasel_plan(d, "id", "time", span = "core")
+# choose from the study schedule; use "observed" only when it represents that schedule
+wave_grid <- "consecutive"
+
+p   <- weasel_plan(d, "id", "time", span = "core", grid = wave_grid)
+print(p$span)
 cmp <- weasel_compare_scenarios(p)
 weasel_print_table(cmp, title = "Scenario comparison")
 cat(weasel_compare_to_sentence(cmp), "\\n")
@@ -428,8 +560,7 @@ if (length(chosen_ids) < 2L || length(excluded_ids) < 2L) {
       "`recommended` marks the highest composite score under the declared weights, nothing " +
       "more: check the `near_tie` column and `attr(cmp, \"score_components\")` before treating " +
       "it as a decision, and inspect `p$span_candidates` to see every window the core rule " +
-      "considered (exact coverage ties warn and pick the earliest). For biennial or " +
-      "year-labelled panels add `grid = \"observed\"`; for a design-fixed window pass explicit " +
+      "considered (exact coverage ties warn and pick the earliest). For a design-fixed window pass explicit " +
       "`lower`/`upper` bounds instead of `span`. If no scenario retains anyone, the code " +
       "stops before summary or extraction; inspect the table and deliberately reconsider " +
       "the window or criteria. Selectivity is optional: set `diagnostic_vars` only after " +
@@ -444,16 +575,21 @@ if (length(chosen_ids) < 2L || length(excluded_ids) < 2L) {
     pipeline: "Plan Pipeline",
     badgeClass: "badge-plan",
     heading: "Plan pipeline: full span",
-    summary:
-      "All observed waves are included in the evaluation window. Scenarios are scored " +
+    summary: REAL_DATA_GUIDANCE +
+      "The full resolved grid is included in the evaluation window. The three built-in " +
+      "presets are examples to review against your design. Scenarios are scored " +
       "against the complete panel range. Use this when the full range is your intended " +
       "analysis window. This does not require complete observation at every wave: " +
       "balanced and lenient scenarios allow missing waves; `anchored_strict` requires " +
       "complete participation through `max_missing = 0`.",
     steps: [
       {
-        fn: 'weasel_plan(data, "id", "time", span = "full")',
-        note: "evaluate all three default scenarios across every observed wave",
+        fn: 'weasel_plan(data, "id", "time", span = "full", grid = wave_grid)',
+        note: "evaluate all three default scenarios across every resolved grid wave",
+      },
+      {
+        fn: "p$span",
+        note: "inspect the resolved scheduled waves before comparing or selecting respondents",
       },
       {
         fn: "weasel_compare_scenarios(p)",
@@ -472,7 +608,11 @@ if (length(chosen_ids) < 2L || length(excluded_ids) < 2L) {
 
 d <- your_data
 
-p   <- weasel_plan(d, "id", "time", span = "full")
+# choose from the study schedule; use "observed" only when it represents that schedule
+wave_grid <- "consecutive"
+
+p   <- weasel_plan(d, "id", "time", span = "full", grid = wave_grid)
+print(p$span)
 cmp <- weasel_compare_scenarios(p)
 weasel_print_table(cmp, title = "Full-span scenarios")
 cat(weasel_compare_to_sentence(cmp), "\\n")
@@ -499,8 +639,8 @@ weasel_print_table(sens, title = "Missing-wave tolerance (other requirements fix
       "data are checked against the plan's structural fingerprint, and a mismatch warns " +
       "(`weasel_data_mismatch`). The printed plan reports the planning population " +
       "(respondents observed in the span versus all distinct ids in the data), which is the " +
-      "denominator behind every retention figure. For biennial or year-labelled panels add " +
-      "`grid = \"observed\"`.",
+      "denominator behind every retention figure. Review the grid against the schedule " +
+      "before interpreting those figures.",
   },
 
   result_plan_justify_core: {
@@ -508,8 +648,8 @@ weasel_print_table(sens, title = "Missing-wave tolerance (other requirements fix
     pipeline: "Plan Pipeline",
     badgeClass: "badge-plan",
     heading: "Plan pipeline: core window with methods justification",
-    summary:
-      "Build a scenario plan over the highest-coverage consecutive wave window, " +
+    summary: REAL_DATA_GUIDANCE +
+      "Build a scenario plan over the highest-coverage window of consecutive grid waves, " +
       "select a scenario, and generate a structured paragraph for your methods section. " +
       "`weasel_justify_subset()` produces text in three verbosity styles and adds a " +
       "formal in-text citation automatically. Designed for pre-registered studies and " +
@@ -518,8 +658,12 @@ weasel_print_table(sens, title = "Missing-wave tolerance (other requirements fix
       "allow missing waves; `anchored_strict` uses `max_missing = 0` for complete participation.",
     steps: [
       {
-        fn: 'weasel_plan(data, "id", "time", span = "core")',
-        note: "score scenarios over the best-coverage consecutive window; window bounds are stored in the plan object",
+        fn: 'weasel_plan(data, "id", "time", span = "core", grid = wave_grid)',
+        note: "score scenarios over the best-coverage window of consecutive grid waves; window bounds are stored in the plan object",
+      },
+      {
+        fn: "p$span",
+        note: "inspect the resolved scheduled waves before comparing or selecting respondents",
       },
       {
         fn: "weasel_compare_scenarios(p)",
@@ -542,7 +686,11 @@ weasel_print_table(sens, title = "Missing-wave tolerance (other requirements fix
 
 d <- your_data
 
-p   <- weasel_plan(d, "id", "time", span = "core")
+# choose from the study schedule; use "observed" only when it represents that schedule
+wave_grid <- "consecutive"
+
+p   <- weasel_plan(d, "id", "time", span = "core", grid = wave_grid)
+print(p$span)
 cmp <- weasel_compare_scenarios(p)
 weasel_print_table(cmp, title = "Scenario comparison")
 
@@ -580,7 +728,7 @@ cat(weasel_justify_subset(p, chosen_scenario, cite = FALSE), "\\n")`,
     pipeline: "Plan Pipeline",
     badgeClass: "badge-plan",
     heading: "Plan pipeline: full span with methods justification",
-    summary:
+    summary: REAL_DATA_GUIDANCE +
       "Evaluate scenarios over all available waves and produce a fully documented, " +
       "reproducible selection. The paragraph from `weasel_justify_subset()` will describe " +
       "the full observed wave range, the structural constraints applied, and the resulting " +
@@ -589,8 +737,12 @@ cat(weasel_justify_subset(p, chosen_scenario, cite = FALSE), "\\n")`,
       "`anchored_strict`.",
     steps: [
       {
-        fn: 'weasel_plan(data, "id", "time", span = "full")',
+        fn: 'weasel_plan(data, "id", "time", span = "full", grid = wave_grid)',
         note: "score all three scenarios over the complete wave range",
+      },
+      {
+        fn: "p$span",
+        note: "inspect the resolved scheduled waves before comparing or selecting respondents",
       },
       {
         fn: "weasel_compare_scenarios(p)",
@@ -613,7 +765,11 @@ cat(weasel_justify_subset(p, chosen_scenario, cite = FALSE), "\\n")`,
 
 d <- your_data
 
-p   <- weasel_plan(d, "id", "time", span = "full")
+# choose from the study schedule; use "observed" only when it represents that schedule
+wave_grid <- "consecutive"
+
+p   <- weasel_plan(d, "id", "time", span = "full", grid = wave_grid)
+print(p$span)
 cmp <- weasel_compare_scenarios(p)
 weasel_print_table(cmp, title = "Full-span scenarios")
 
@@ -740,12 +896,14 @@ const SLUGS = {
   dummy_purpose: "dummy-data",
   dummy_goal: "dummy-pipeline",
   scope_range: "scope-range",
+  plan_criteria: "plan-criteria",
   plan_doc: "plan-methods",
   plan_span_justify: "plan-methods-span",
   plan_span: "plan-span",
   result_scope_full: "scope-full",
   result_scope_bounded: "scope-bounded",
   result_scope_learn: "scope-learn",
+  result_plan_custom: "plan-custom",
   result_plan_core: "plan-core",
   result_plan_full: "plan-full",
   result_plan_justify_core: "plan-core-methods",
