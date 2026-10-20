@@ -34,11 +34,6 @@ One structural convention drives everything: a respondent is observed
 at a wave when a row with that `(id, wave)` pair exists in the
 long-format data; a missed wave is an absent row.
 
-> **Repository history note:** Some early, pre-`v0.3.1` development
-> history was consolidated while the repository workflow was being refined.
-> A forthcoming update will add brief archival provenance information;
-> the current releases and documentation remain canonical.
-
 ## Installation
 
 ```r
@@ -154,6 +149,9 @@ mine alone.
 instead of silent. It seems only consistent to be equally explicit
 about how the package itself was made. If you have questions about any
 part of that process, the issue tracker is open.
+
+Some development history before v0.3.1 was consolidated during repository
+maintenance. Tagged releases identify the published source versions.
 
 ## License
 
