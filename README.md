@@ -2,6 +2,7 @@
 
 <!-- badges: start -->
 [![R-CMD-check](https://github.com/siardv/weasel/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/siardv/weasel/actions/workflows/R-CMD-check.yaml)
+[![CRAN status](https://www.r-pkg.org/badges/version/weasel)](https://CRAN.R-project.org/package=weasel)
 <!-- badges: end -->
 
 **`weasel` turns wave-and-respondent selection in longitudinal panels into an explicit, reproducible workflow.**
@@ -35,6 +36,14 @@ at a wave when a row with that `(id, wave)` pair exists in the
 long-format data; a missed wave is an absent row.
 
 ## Installation
+
+Install the released version from [CRAN](https://CRAN.R-project.org/package=weasel):
+
+```r
+install.packages("weasel")
+```
+
+Alternatively, install the development version from GitHub:
 
 ```r
 # install.packages("remotes")
