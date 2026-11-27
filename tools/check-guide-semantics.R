@@ -174,12 +174,30 @@ for (recipe in plan_recipes) {
   run <- run_recipe(recipe, panel)
   assert(is.null(run$error), recipe, "failed on the balanced fixture")
   assert(identical(run$env$chosen_scenario, "anchored_balanced"),
-         recipe, "did not choose the nonempty recommended scenario")
+         recipe, "did not use the editable example choice")
   assert(setequal(unique(run$env$analysis_data$id), 1:20),
          recipe, "extracted the wrong respondents")
   assert(all(vapply(selection_calls(run), function(x) {
     identical(x$args[[2]], run$env$chosen_scenario)
   }, logical(1))), recipe, "used inconsistent scenarios")
+
+  strict <- run_recipe(recipe, panel, diagnostic_vars = if (recipe == "result_plan_core") "x",
+                       chosen_scenario = "anchored_strict")
+  assert(is.null(strict$error) && setequal(unique(strict$env$analysis_data$id), 1:2) &&
+           identical(strict$env$cmp$scenario[strict$env$cmp$recommended], "anchored_balanced"),
+         recipe, "did not extract the named non-winner")
+  assert(identical(strict$env$s$headline$scenario, "anchored_strict") &&
+           all(vapply(selection_calls(strict), function(call) {
+             identical(call$args[[2]], "anchored_strict")
+           }, logical(1))), recipe, "did not carry the edited choice through downstream calls")
+  components <- attr(strict$env$cmp, "score_components")
+  assert(identical(components$scenario, strict$env$cmp$scenario) &&
+           any(vapply(calls_named(strict, "weasel_print_table"), function(call) {
+             identical(call$args[[1]], components)
+           }, logical(1))), recipe, "did not display the score components")
+  unknown <- run_recipe(recipe, panel, chosen_scenario = "absent")
+  assert(inherits(unknown$error, "error") && length(selection_calls(unknown)) == 0L,
+         recipe, "did not stop an unknown choice before downstream calls")
 }
 core <- run_recipe("result_plan_core", panel, diagnostic_vars = "x")
 assert(is.null(core$error), "core recipe rejected an eligible covariate")
@@ -254,12 +272,12 @@ sparse <- rbind(expand.grid(id = 1:5, time = 1:3),
                 expand.grid(id = 6:10, time = 4:6))
 for (recipe in plan_recipes) {
   run <- run_recipe(recipe, sparse)
-  assert(inherits(run$error, "error"), recipe, "did not stop an empty recommendation")
-  assert(grepl("recommend", conditionMessage(run$error), ignore.case = TRUE) &&
+  assert(inherits(run$error, "error"), recipe, "did not stop an empty choice")
+  assert(grepl("chosen scenario is absent or empty", conditionMessage(run$error), fixed = TRUE) &&
            !grepl("scenario not found", conditionMessage(run$error), fixed = TRUE),
-         recipe, "did not explain the absent recommendation")
+         recipe, "did not explain the empty named choice")
   assert(length(selection_calls(run)) == 0L,
-         recipe, "called selection APIs before resolving an empty recommendation")
+         recipe, "called selection APIs before resolving an empty choice")
   assert(!exists("analysis_data", envir = run$env, inherits = FALSE),
          recipe, "created analysis data without a chosen scenario")
 }
@@ -383,7 +401,10 @@ for (recipe in real_recipes) {
 biennial <- expand.grid(id = 1:5, time = c(2008L, 2010L, 2012L))
 presets <- c("anchored_strict", "anchored_balanced", "lenient_info_max")
 for (recipe in plan_recipes) {
-  annual <- run_recipe(recipe, biennial)
+  empty_choice <- run_recipe(recipe, biennial)
+  assert(inherits(empty_choice$error, "error") && length(selection_calls(empty_choice)) == 0L &&
+           any(empty_choice$env$cmp$n_ids > 0), recipe, "silently switched from an empty choice")
+  annual <- run_recipe(recipe, biennial, chosen_scenario = "lenient_info_max")
   assert_grid_audit(annual, recipe, "consecutive", 2008:2012)
   counts <- annual$env$p$plan$n_ids[match(presets, annual$env$p$plan$scenario)]
   assert(all(counts == c(0L, 0L, 5L)) &&
@@ -491,7 +512,7 @@ for (waves in list(as.character(1:3), factor(1:3), c(1, 1.5, 3), c(1, 2, Inf))) 
 }
 
 unlink(snippet_dir, recursive = TRUE)
-cat("guide semantics OK: scenario consistency, fixed-window completeness,",
+cat("guide semantics OK: named non-winner, score components, scenario consistency, fixed-window completeness,",
     "empty/optional diagnostic guards, full sensitivity display, and",
     "Scope/Plan observation equivalence\n")
 cat("guide semantics OK: explicit grid and span audits, biennial/absent-wave",
