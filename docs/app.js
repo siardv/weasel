@@ -6,6 +6,15 @@ const REAL_DATA_GUIDANCE =
   'recorded wave values represent the intended schedule. An entirely absent scheduled ' +
   'wave is lost from an observed grid. Inspect the printed span before selection. ';
 
+const PRESET_SCENARIO_CHOICE = `weasel_print_table(attr(cmp, "score_components"), title = "Score components")
+
+# choose a named rule for your study after reviewing cmp; edit this example choice
+chosen_scenario <- "anchored_balanced"
+chosen_row <- match(chosen_scenario, cmp$scenario)
+if (length(chosen_scenario) != 1L || is.na(chosen_row) || cmp$n_ids[chosen_row] == 0L) {
+  stop("The chosen scenario is absent or empty. Inspect cmp and revise your choice or criteria before continuing.")
+}`;
+
 const TREE = {
   start: {
     type: "question",
@@ -490,7 +499,7 @@ cat(weasel_justify_subset(p, chosen_scenario), "\\n")`,
       },
       {
         fn: "weasel_compare_scenarios(p)",
-        note: "inspect the recommendation; stop if none retains respondents, then deliberately reconsider the window or criteria",
+        note: "review the scores and their components, then set chosen_scenario to the named rule for your study",
       },
       {
         fn: 'weasel_summarize_subset(p, chosen_scenario, data, "id", "time")',
@@ -522,11 +531,7 @@ cmp <- weasel_compare_scenarios(p)
 weasel_print_table(cmp, title = "Scenario comparison")
 cat(weasel_compare_to_sentence(cmp), "\\n")
 
-chosen_scenario <- cmp$scenario[which(cmp$recommended %in% TRUE & cmp$n_ids > 0)]
-if (length(chosen_scenario) != 1L || is.na(chosen_scenario) ||
-    !chosen_scenario %in% p$plan$scenario) {
-  stop("No single recommended scenario. Inspect cmp and deliberately revise the window or criteria before continuing.")
-}
+${PRESET_SCENARIO_CHOICE}
 s <- weasel_summarize_subset(p, chosen_scenario, d, "id", "time")
 weasel_print_table(s$headline)
 weasel_print_table(s$per_wave_coverage, title = "Per-wave coverage")
@@ -558,10 +563,10 @@ if (length(chosen_ids) < 2L || length(excluded_ids) < 2L) {
 }`,
     note:
       "`recommended` marks the highest composite score under the declared weights, nothing " +
-      "more: check the `near_tie` column and `attr(cmp, \"score_components\")` before treating " +
-      "it as a decision, and inspect `p$span_candidates` to see every window the core rule " +
+      "more. Review `near_tie` and `attr(cmp, \"score_components\")`, then name the rule your study requires. " +
+      "Inspect `p$span_candidates` to see every window the core rule " +
       "considered (exact coverage ties warn and pick the earliest). For a design-fixed window pass explicit " +
-      "`lower`/`upper` bounds instead of `span`. If no scenario retains anyone, the code " +
+      "`lower`/`upper` bounds instead of `span`. If the named scenario retains nobody, the code " +
       "stops before summary or extraction; inspect the table and deliberately reconsider " +
       "the window or criteria. Selectivity is optional: set `diagnostic_vars` only after " +
       "choosing relevant numeric/logical covariates. `at = \"first\"` uses each respondent's " +
@@ -593,7 +598,7 @@ if (length(chosen_ids) < 2L || length(excluded_ids) < 2L) {
       },
       {
         fn: "weasel_compare_scenarios(p)",
-        note: "inspect the recommendation; stop if none retains respondents, then deliberately reconsider the window or criteria",
+        note: "review the scores and their components, then set chosen_scenario to the named rule for your study",
       },
       {
         fn: 'weasel_summarize_subset(p, chosen_scenario, data, "id", "time")',
@@ -617,11 +622,7 @@ cmp <- weasel_compare_scenarios(p)
 weasel_print_table(cmp, title = "Full-span scenarios")
 cat(weasel_compare_to_sentence(cmp), "\\n")
 
-chosen_scenario <- cmp$scenario[which(cmp$recommended %in% TRUE & cmp$n_ids > 0)]
-if (length(chosen_scenario) != 1L || is.na(chosen_scenario) ||
-    !chosen_scenario %in% p$plan$scenario) {
-  stop("No single recommended scenario. Inspect cmp and deliberately revise the window or criteria before continuing.")
-}
+${PRESET_SCENARIO_CHOICE}
 
 s <- weasel_summarize_subset(p, chosen_scenario, d, "id", "time")
 cat(weasel_subset_to_sentence(s), "\\n")
@@ -652,8 +653,7 @@ weasel_print_table(sens, title = "Missing-wave tolerance (other requirements fix
       "Build a scenario plan over the highest-coverage window of consecutive grid waves, " +
       "select a scenario, and generate a structured paragraph for your methods section. " +
       "`weasel_justify_subset()` produces text in three verbosity styles and adds a " +
-      "formal in-text citation automatically. Designed for pre-registered studies and " +
-      "manuscripts where the data-preparation stage must be documented transparently. " +
+      "formal in-text citation automatically. " +
       "A fixed window does not ensure complete records: balanced and lenient scenarios " +
       "allow missing waves; `anchored_strict` uses `max_missing = 0` for complete participation.",
     steps: [
@@ -667,7 +667,7 @@ weasel_print_table(sens, title = "Missing-wave tolerance (other requirements fix
       },
       {
         fn: "weasel_compare_scenarios(p)",
-        note: "inspect the recommendation as a starting point; stop if none retains respondents and deliberately reconsider the window or criteria",
+        note: "review the scores and their components, then set chosen_scenario to the named rule for your study",
       },
       {
         fn: 'weasel_summarize_subset(p, chosen_scenario, data, "id", "time")',
@@ -694,11 +694,7 @@ print(p$span)
 cmp <- weasel_compare_scenarios(p)
 weasel_print_table(cmp, title = "Scenario comparison")
 
-chosen_scenario <- cmp$scenario[which(cmp$recommended %in% TRUE & cmp$n_ids > 0)]
-if (length(chosen_scenario) != 1L || is.na(chosen_scenario) ||
-    !chosen_scenario %in% p$plan$scenario) {
-  stop("No single recommended scenario. Inspect cmp and deliberately revise the window or criteria before continuing.")
-}
+${PRESET_SCENARIO_CHOICE}
 
 s <- weasel_summarize_subset(p, chosen_scenario, d, "id", "time")
 weasel_print_table(s$headline)
@@ -717,7 +713,7 @@ cat(weasel_justify_subset(p, chosen_scenario, cite = FALSE), "\\n")`,
     note:
       'Three verbosity styles are available: `"methods"` (full paragraph, default), ' +
       '`"concise"` (short summary, suitable for supplementary sections), and ' +
-      '`"extended"` (detailed rationale). ' +
+      '`"extended"` (detailed description). ' +
       "The in-text citation is derived automatically from the package metadata, " +
       "for example `(van den Bosch, 2026)`; supply `author` and `year` to override " +
       "it, or `cite = FALSE` to omit it.",
@@ -746,7 +742,7 @@ cat(weasel_justify_subset(p, chosen_scenario, cite = FALSE), "\\n")`,
       },
       {
         fn: "weasel_compare_scenarios(p)",
-        note: "inspect the recommendation; stop if none retains respondents, then deliberately reconsider the window or criteria",
+        note: "review the scores and their components, then set chosen_scenario to the named rule for your study",
       },
       {
         fn: 'weasel_summarize_subset(p, chosen_scenario, data, "id", "time")',
@@ -773,12 +769,10 @@ print(p$span)
 cmp <- weasel_compare_scenarios(p)
 weasel_print_table(cmp, title = "Full-span scenarios")
 
-chosen_scenario <- cmp$scenario[which(cmp$recommended %in% TRUE & cmp$n_ids > 0)]
-if (length(chosen_scenario) != 1L || is.na(chosen_scenario) ||
-    !chosen_scenario %in% p$plan$scenario) {
-  stop("No single recommended scenario. Inspect cmp and deliberately revise the window or criteria before continuing.")
-}
+${PRESET_SCENARIO_CHOICE}
 
+s <- weasel_summarize_subset(p, chosen_scenario, d, "id", "time")
+weasel_print_table(s$headline)
 analysis_data <- weasel_apply(p, chosen_scenario)
 
 # the citation (package author and year) is included automatically
